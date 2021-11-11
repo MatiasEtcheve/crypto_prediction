@@ -1,13 +1,14 @@
-from datetime import datetime
+import os
+from datetime import datetime, timedelta, date
 from pathlib import Path
 from time import time
+import re
 from typing import Annotated
 import pandas as pd
 
-import config
-
 FORMAT = "%Y-%m-%d"
 """Expected datetime format"""
+complete_time = {"d": "days"}
 KLINE_COLUMNS = [
     "Open time",
     "Open",
@@ -37,15 +38,9 @@ def select_klines_from_file(beginning_date, ending_date, filename):
     Returns:
         pd.DataFrame: dataframe containing klines
     """
-    data = pd.read_csv(filename, delimiter=",", header=0, dtype=float)
-    readable_datetime = pd.to_datetime(data["Open time"], unit="ms")
-    data["Open time"] = pd.to_datetime(data["Open time"], unit="ms")
-    # data["Close time"] = pd.to_datetime(data["Close time"], unit="ms")
-    data.set_index("Open time", inplace=True)
-    return data
-    # return data[
-    #     (readable_datetime >= beginning_date) & (ending_date >= readable_datetime)
-    # ]
+    data = pd.read_csv(filename, delimiter=",", header=0, index_col=0)
+    data.index = pd.to_datetime(data.index)
+    return data.loc[beginning_date:ending_date]
 
 
 def download_and_save_klines(symbol, interval, beginning_date, ending_date):
@@ -63,16 +58,20 @@ def download_and_save_klines(symbol, interval, beginning_date, ending_date):
     """
     from binance.client import Client
 
-    client = Client(config.API_KEY, config.API_SECRET)
+    api_key = os.getenv("BINANCE_API_KEY", None)
+    api_secret = os.getenv("BINANCE_API_SECRET", None)
+    client = Client(api_key, api_secret)
+    print("downloading klines...", end="")
     klines = client.get_historical_klines(
         symbol,
         interval,
         beginning_date.strftime(FORMAT),
         ending_date.strftime(FORMAT),
     )
+    print("done")
     data = pd.DataFrame(klines, columns=KLINE_COLUMNS)
     filename = (
-        "data/"
+        "candlesticks/"
         + "_".join(
             [
                 symbol,
@@ -83,7 +82,10 @@ def download_and_save_klines(symbol, interval, beginning_date, ending_date):
         )
         + ".csv"
     )
-    data.to_csv(filename, sep=",", header=KLINE_COLUMNS, index=False)
+    data["Open time"] = pd.to_datetime(data["Open time"], unit="ms")
+    data["Close time"] = pd.to_datetime(data["Close time"], unit="ms")
+    data.set_index("Open time", inplace=True, drop=True)
+    data.to_csv(filename, sep=",", header=data.columns, index=True)
     return filename
 
 
@@ -102,7 +104,7 @@ def select_data(symbol, interval, beginning_date, ending_date):
     Returns:
         pd.DataFrame: dataframe containing klines
     """
-    p = (Path(__file__).resolve().parent / "data").glob("**/*")
+    p = (Path(__file__).resolve().parent / "candlesticks").glob("**/*")
     files = [x for x in p if x.is_file()]
     filenames = [x.stem.split("_") for x in files]
     df_files = pd.DataFrame(
@@ -111,22 +113,34 @@ def select_data(symbol, interval, beginning_date, ending_date):
     df_files[["start_date", "end_date"]] = df_files[["start_date", "end_date"]].apply(
         lambda x: pd.to_datetime(x, format=FORMAT)
     )
+
+    beginning_date = datetime(beginning_date.year, beginning_date.month, beginning_date.day)
+    ending_date = datetime(ending_date.year, ending_date.month, ending_date.day)
+
     later_file = df_files[
-        (df_files["interval"] == interval) & (df_files["end_date"] >= ending_date)
+        (df_files["interval"] == interval) & (df_files["end_date"] > ending_date)
     ]
     sooner_file = df_files[
-        (df_files["interval"] == interval) & (df_files["start_date"] <= beginning_date)
+        (df_files["interval"] == interval) & (df_files["start_date"] < beginning_date)
     ]
+
     perfect_file = df_files[
         (df_files["interval"] == interval)
-        & (df_files["start_date"] <= beginning_date)
-        & (df_files["end_date"] >= ending_date)
+        & (
+            df_files["start_date"]
+            <= beginning_date
+        )
+        & (
+            df_files["end_date"]
+            >= ending_date
+        )
     ]
     useless_file = df_files[
         (df_files["interval"] == interval)
-        & (df_files["start_date"] > beginning_date)
-        & (df_files["end_date"] < ending_date)
+        & (df_files["start_date"] >= beginning_date)
+        & (df_files["end_date"] <= ending_date)
     ]
+
     if not perfect_file.empty:
         filename = files[perfect_file.index[0]]
         return select_klines_from_file(beginning_date, ending_date, filename)
