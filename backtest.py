@@ -1,14 +1,7 @@
-import get_data
+ from datetime import datetime, timedelta
 import backtrader as bt
-import json
-from io import StringIO
-import strategy.test
-from pprint import pprint
-from strategy import moving_average
-from datetime import timedelta, datetime
-from time import time
 from broker import Cerebro
-from time import time
+from strategy import trix
 
 class PandasData(bt.feed.DataBase):
     params = (
@@ -24,25 +17,40 @@ class PandasData(bt.feed.DataBase):
 
 
 from_date = datetime.now() - timedelta(days=365)
-end_date = datetime.now() - timedelta(days=10)
-interval = "12h"
-symbol = "ETHUSDT"
-# cerebro = Cerebro(symbol, interval, from_date, end_date, strategy.test.MACrossover, plot_rules="bars")
-
-
-cerebro = Cerebro(
-    symbol,
-    interval,
-    from_date,
-    end_date,
-    moving_average.MAChannel,
-    plot_rules="equity bars indicators",
-)
-results = cerebro.run()
-cerebro.save()
-cerebro.plot(
-    volume=False,
-    style="candle",
-    barup="green",
-)
-# print(cerebro)
+# from_date = datetime(2021,9, 18) - timedelta(minutes=30*200)
+end_date = datetime.now()
+# end_date = datetime(2021,9, 23)
+interval = "30m"
+symbol = "BTCUSDT"
+for stop_loss in [0.02, 0.05, 0.15, 0.30]:
+    for trix_period in [15, 25, 66, 100, 150]:
+        for stoch_period in [15, 25, 66, 100, 150]:
+            print(f"STOP LOSS: {stop_loss}")
+            print(f"TRIX PERIOD: {trix_period}")
+            print(f"STOCH PERIOD: {stoch_period}")
+            cerebro = Cerebro(
+                symbol,
+                interval,
+                from_date,
+                end_date,
+                trix.TRIXStoRSI,
+                stop_loss=stop_loss,
+                trix_period=trix_period,
+                stoch_period=stoch_period,
+                trend=True,
+                plot_rules="equity bars trades buysell",
+                tradehistory=True,
+                # verbose=1,
+            )
+            results = cerebro.run()
+            cerebro.save()
+            print(cerebro)
+            # cerebro.plot(
+            #     volume=False,
+            #     # style="candle",
+            #     # barup="green",
+            #     # start=datetime(2021, 2, 13),
+            #     # end=datetime(2021, 2, 26),
+            # )
+            # raise ValueError
+            print("=================================")

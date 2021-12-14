@@ -1,8 +1,3 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from datetime import datetime, timedelta, time, date
-import os.path
-import sys
 import math
 import backtrader as bt
 
@@ -82,3 +77,4 @@ class MAChannel(bt.Strategy):
             == self.p.consecutive_period
         ):
             self.sell()
+>>>>>>> cac7099 (backtrader)

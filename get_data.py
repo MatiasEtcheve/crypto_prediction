@@ -1,4 +1,3 @@
-import os
 from datetime import datetime, timedelta, date
 from pathlib import Path
 from time import time
@@ -118,14 +117,14 @@ def select_data(symbol, interval, beginning_date, ending_date):
     ending_date = datetime(ending_date.year, ending_date.month, ending_date.day)
 
     later_file = df_files[
-        (df_files["interval"] == interval) & (df_files["end_date"] > ending_date)
+        (df_files["ticker"] == symbol) & (df_files["interval"] == interval) & (df_files["end_date"] > ending_date)
     ]
     sooner_file = df_files[
-        (df_files["interval"] == interval) & (df_files["start_date"] < beginning_date)
+        (df_files["ticker"] == symbol) & (df_files["interval"] == interval) & (df_files["start_date"] < beginning_date)
     ]
 
     perfect_file = df_files[
-        (df_files["interval"] == interval)
+        (df_files["ticker"] == symbol) & (df_files["interval"] == interval)
         & (
             df_files["start_date"]
             <= beginning_date
@@ -136,7 +135,7 @@ def select_data(symbol, interval, beginning_date, ending_date):
         )
     ]
     useless_file = df_files[
-        (df_files["interval"] == interval)
+        (df_files["ticker"] == symbol) & (df_files["interval"] == interval)
         & (df_files["start_date"] >= beginning_date)
         & (df_files["end_date"] <= ending_date)
     ]
