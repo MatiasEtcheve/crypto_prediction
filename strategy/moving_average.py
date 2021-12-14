@@ -77,4 +77,3 @@ class MAChannel(bt.Strategy):
             == self.p.consecutive_period
         ):
             self.sell()
->>>>>>> cac7099 (backtrader)
