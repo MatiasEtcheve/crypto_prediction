@@ -4,6 +4,10 @@ from time import time
 import re
 from typing import Annotated
 import pandas as pd
+import vectorbt as vbt
+import os
+
+import pytz
 
 FORMAT = "%Y-%m-%d"
 """Expected datetime format"""
@@ -37,10 +41,8 @@ def select_klines_from_file(beginning_date, ending_date, filename):
     Returns:
         pd.DataFrame: dataframe containing klines
     """
-    data = pd.read_csv(filename, delimiter=",", header=0, index_col=0)
-    data.index = pd.to_datetime(data.index)
-    return data.loc[beginning_date:ending_date]
-
+    klines = vbt.Data.load(filename)
+    return klines.loc[beginning_date:ending_date]
 
 def download_and_save_klines(symbol, interval, beginning_date, ending_date):
     """
@@ -55,36 +57,20 @@ def download_and_save_klines(symbol, interval, beginning_date, ending_date):
     Returns:
         str: filename of csv file containing the klines
     """
-    from binance.client import Client
-
-    api_key = os.getenv("BINANCE_API_KEY", None)
-    api_secret = os.getenv("BINANCE_API_SECRET", None)
-    client = Client(api_key, api_secret)
-    print("downloading klines...", end="")
-    klines = client.get_historical_klines(
-        symbol,
-        interval,
-        beginning_date.strftime(FORMAT),
-        ending_date.strftime(FORMAT),
-    )
-    print("done")
-    data = pd.DataFrame(klines, columns=KLINE_COLUMNS)
+    klines = vbt.BinanceData.download(symbol, start=beginning_date, end=ending_date, interval=interval)
     filename = (
         "candlesticks/"
         + "_".join(
             [
-                symbol,
+                "-".join(symbol),
                 interval,
                 beginning_date.strftime(FORMAT),
                 ending_date.strftime(FORMAT),
             ]
         )
-        + ".csv"
+        + ".pickle"
     )
-    data["Open time"] = pd.to_datetime(data["Open time"], unit="ms")
-    data["Close time"] = pd.to_datetime(data["Close time"], unit="ms")
-    data.set_index("Open time", inplace=True, drop=True)
-    data.to_csv(filename, sep=",", header=data.columns, index=True)
+    klines.save(fname=filename)
     return filename
 
 
@@ -107,24 +93,28 @@ def select_data(symbol, interval, beginning_date, ending_date):
     files = [x for x in p if x.is_file()]
     filenames = [x.stem.split("_") for x in files]
     df_files = pd.DataFrame(
-        filenames, columns=["ticker", "interval", "start_date", "end_date"]
+        filenames, columns=["symbol", "interval", "start_date", "end_date"]
     )
     df_files[["start_date", "end_date"]] = df_files[["start_date", "end_date"]].apply(
-        lambda x: pd.to_datetime(x, format=FORMAT)
+        lambda x: pd.to_datetime(x, format=FORMAT).dt.tz_localize('UTC')
     )
 
-    beginning_date = datetime(beginning_date.year, beginning_date.month, beginning_date.day)
-    ending_date = datetime(ending_date.year, ending_date.month, ending_date.day)
+    if isinstance(symbol, str):
+        symbol = [symbol]
+    symbol_to_string = "-".join(symbol)
+
+    beginning_date = datetime(beginning_date.year, beginning_date.month, beginning_date.day, tzinfo=pytz.utc)
+    ending_date = datetime(ending_date.year, ending_date.month, ending_date.day,  tzinfo=pytz.utc)
 
     later_file = df_files[
-        (df_files["ticker"] == symbol) & (df_files["interval"] == interval) & (df_files["end_date"] > ending_date)
+        (df_files["symbol"] == symbol_to_string) & (df_files["interval"] == interval) & (df_files["end_date"] > ending_date)
     ]
     sooner_file = df_files[
-        (df_files["ticker"] == symbol) & (df_files["interval"] == interval) & (df_files["start_date"] < beginning_date)
+        (df_files["symbol"] == symbol_to_string) & (df_files["interval"] == interval) & (df_files["start_date"] < beginning_date)
     ]
 
     perfect_file = df_files[
-        (df_files["ticker"] == symbol) & (df_files["interval"] == interval)
+        (df_files["symbol"] == symbol_to_string) & (df_files["interval"] == interval)
         & (
             df_files["start_date"]
             <= beginning_date
@@ -135,7 +125,7 @@ def select_data(symbol, interval, beginning_date, ending_date):
         )
     ]
     useless_file = df_files[
-        (df_files["ticker"] == symbol) & (df_files["interval"] == interval)
+        (df_files["symbol"] == symbol_to_string) & (df_files["interval"] == interval)
         & (df_files["start_date"] >= beginning_date)
         & (df_files["end_date"] <= ending_date)
     ]
@@ -162,3 +152,7 @@ def select_data(symbol, interval, beginning_date, ending_date):
         ending_date,
     )
     return select_klines_from_file(beginning_date, ending_date, new_filename)
+
+if __name__ == '__main__':
+    klines = select_data(["BTCUSDT", "ETHUSDT"], "30m", beginning_date=datetime.now()-timedelta(days=365), ending_date=datetime.now())
+    klines.plot(column='Close', base=1).show()
