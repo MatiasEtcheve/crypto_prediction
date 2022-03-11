@@ -10,3 +10,5 @@ recommonmark==0.7.1
 TA_Lib==0.4.23
 total==0.0.7
 vectorbt==0.23.0
+python-binance==1.0.15
+black==21.12b0

@@ -5,28 +5,81 @@ from pathlib import Path
 from time import time
 from typing import Annotated
 
+import numpy as np
 import pandas as pd
 import pytz
+import talib
 import vectorbt as vbt
+import yfinance as yf
 
 FORMAT = "%Y-%m-%d"
 """Expected datetime format"""
-complete_time = {"d": "days"}
-KLINE_COLUMNS = [
-    "Open time",
-    "Open",
-    "High",
-    "Low",
-    "Close",
-    "Volume",
-    "Close time",
-    "Quote asset volume",
-    "Number of trades",
-    "Taker buy base asset volume",
-    "Taker buy quote asset volume",
-    "Ignore",
-]
-"""Kline columns of dataframe"""
+
+
+def concatenate_indicators(data):
+    differences = data.diff(periods=1, axis=0).rename(
+        columns={
+            "Open": "Opend",
+            "High": "Highd",
+            "Low": "Lowd",
+            "Close": "Closed",
+            "Volume": "Volumed",
+        }
+    )
+    pct_changes = data.pct_change(periods=1, axis=0).rename(
+        columns={
+            "Open": "Openp",
+            "High": "Highp",
+            "Low": "Lowp",
+            "Close": "Closep",
+            "Volume": "Volumep",
+        }
+    )
+    SMA5 = talib.SMA(data["Close"], timeperiod=5)
+    SMA10 = talib.SMA(data["Close"], timeperiod=10)
+    SMA20 = talib.SMA(data["Close"], timeperiod=20)
+    EMA12 = talib.EMA(data["Close"], timeperiod=12)
+    EMA26 = talib.EMA(data["Close"], timeperiod=26)
+    MACD, MACDsign, _ = talib.MACD(
+        data["Close"], fastperiod=12, slowperiod=26, signalperiod=9
+    )
+    ROC13 = talib.ROC(data["Close"], timeperiod=13)
+    K15, D5 = talib.STOCHF(
+        data["High"],
+        data["Low"],
+        data["Close"],
+        fastk_period=15,
+        fastd_period=5,
+        fastd_matype=0,
+    )
+    BOLup, _, BOLlow = talib.BBANDS(
+        data["Close"], timeperiod=5, nbdevup=2, nbdevdn=2, matype=0
+    )
+    BOL = (data["Close"] - BOLlow) / (BOLup - BOLlow)
+    MOM12 = talib.MOM(data["Close"], timeperiod=12)
+    indicators = {
+        "SMA5": SMA5,
+        "SMA10": SMA10,
+        "SMA20": SMA20,
+        "EMA12": EMA12,
+        "EMA26": EMA26,
+        "MACD": MACD,
+        "MACDsign": MACDsign,
+        "ROC13": ROC13,
+        "K15": K15,
+        "D5": D5,
+        "BOLup": BOLup,
+        "BOLlow": BOLlow,
+        "BOL": BOL,
+        "MOM12": MOM12,
+    }
+    indicators_df = pd.concat(
+        indicators.values(),
+        axis=1,
+        keys=indicators.keys(),
+    )
+    klines = pd.concat([data, differences, pct_changes, indicators_df], axis=1)
+    return klines
 
 
 def select_klines_from_file(beginning_date, ending_date, filename):
@@ -41,8 +94,10 @@ def select_klines_from_file(beginning_date, ending_date, filename):
     Returns:
         pd.DataFrame: dataframe containing klines
     """
-    klines = vbt.Data.load(filename)
-    return klines.loc[beginning_date:ending_date]
+    klines = pd.read_csv(filename)
+    klines["Date"] = pd.to_datetime(klines["Date"], utc=True)
+    mask = (klines["Date"] >= beginning_date) & (klines["Date"] <= ending_date)
+    return klines.loc[mask]
 
 
 def download_and_save_klines(symbol, interval, beginning_date, ending_date):
@@ -58,8 +113,12 @@ def download_and_save_klines(symbol, interval, beginning_date, ending_date):
     Returns:
         str: filename of csv file containing the klines
     """
-    klines = vbt.BinanceData.download(
-        symbol, start=beginning_date, end=ending_date, interval=interval
+    klines = yf.download(
+        tickers=symbol,
+        start=beginning_date,
+        end=ending_date,
+        interval=interval,
+        auto_adjust=True,
     )
     filename = (
         "candlesticks/"
@@ -71,10 +130,11 @@ def download_and_save_klines(symbol, interval, beginning_date, ending_date):
                 ending_date.strftime(FORMAT),
             ]
         )
-        + ".pickle"
+        + ".txt"
     )
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
-    klines.save(fname=filename)
+    klines = concatenate_indicators(klines)
+    klines.to_csv(filename)
     return filename
 
 
@@ -164,9 +224,8 @@ def select_data(symbol, interval, beginning_date, ending_date):
 
 if __name__ == "__main__":
     klines = select_data(
-        ["BTCUSDT", "ETHUSDT"],
+        ["BTC-USD"],
         "1d",
         beginning_date=datetime.now() - timedelta(days=365),
         ending_date=datetime.now(),
     )
-    klines.plot(column="Close", base=1).show()
