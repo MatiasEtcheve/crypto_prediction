@@ -13,3 +13,6 @@ __pycache__/
 .vscode/
 .python-version
 config.py
+wandb/
+candlesticks/
+binance/
