@@ -1,28 +1,85 @@
-from datetime import datetime, timedelta, date
+import os
+import re
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from time import time
-import re
 from typing import Annotated
+
+import numpy as np
 import pandas as pd
+import pytz
+import talib
+import vectorbt as vbt
+import yfinance as yf
 
 FORMAT = "%Y-%m-%d"
 """Expected datetime format"""
-complete_time = {"d": "days"}
-KLINE_COLUMNS = [
-    "Open time",
-    "Open",
-    "High",
-    "Low",
-    "Close",
-    "Volume",
-    "Close time",
-    "Quote asset volume",
-    "Number of trades",
-    "Taker buy base asset volume",
-    "Taker buy quote asset volume",
-    "Ignore",
-]
-"""Kline columns of dataframe"""
+
+
+def concatenate_indicators(data):
+    differences = data.diff(periods=1, axis=0).rename(
+        columns={
+            "Open": "Opend",
+            "High": "Highd",
+            "Low": "Lowd",
+            "Close": "Closed",
+            "Volume": "Volumed",
+        }
+    )
+    pct_changes = data.pct_change(periods=1, axis=0).rename(
+        columns={
+            "Open": "Openp",
+            "High": "Highp",
+            "Low": "Lowp",
+            "Close": "Closep",
+            "Volume": "Volumep",
+        }
+    )
+    SMA5 = talib.SMA(data["Close"], timeperiod=5)
+    SMA10 = talib.SMA(data["Close"], timeperiod=10)
+    SMA20 = talib.SMA(data["Close"], timeperiod=20)
+    EMA12 = talib.EMA(data["Close"], timeperiod=12)
+    EMA26 = talib.EMA(data["Close"], timeperiod=26)
+    MACD, MACDsign, _ = talib.MACD(
+        data["Close"], fastperiod=12, slowperiod=26, signalperiod=9
+    )
+    ROC13 = talib.ROC(data["Close"], timeperiod=13)
+    K15, D5 = talib.STOCHF(
+        data["High"],
+        data["Low"],
+        data["Close"],
+        fastk_period=15,
+        fastd_period=5,
+        fastd_matype=0,
+    )
+    BOLup, _, BOLlow = talib.BBANDS(
+        data["Close"], timeperiod=5, nbdevup=2, nbdevdn=2, matype=0
+    )
+    BOL = (data["Close"] - BOLlow) / (BOLup - BOLlow)
+    MOM12 = talib.MOM(data["Close"], timeperiod=12)
+    indicators = {
+        "SMA5": SMA5,
+        "SMA10": SMA10,
+        "SMA20": SMA20,
+        "EMA12": EMA12,
+        "EMA26": EMA26,
+        "MACD": MACD,
+        "MACDsign": MACDsign,
+        "ROC13": ROC13,
+        "K15": K15,
+        "D5": D5,
+        "BOLup": BOLup,
+        "BOLlow": BOLlow,
+        "BOL": BOL,
+        "MOM12": MOM12,
+    }
+    indicators_df = pd.concat(
+        indicators.values(),
+        axis=1,
+        keys=indicators.keys(),
+    )
+    klines = pd.concat([data, differences, pct_changes, indicators_df], axis=1)
+    return klines
 
 
 def select_klines_from_file(beginning_date, ending_date, filename):
@@ -37,9 +94,10 @@ def select_klines_from_file(beginning_date, ending_date, filename):
     Returns:
         pd.DataFrame: dataframe containing klines
     """
-    data = pd.read_csv(filename, delimiter=",", header=0, index_col=0)
-    data.index = pd.to_datetime(data.index)
-    return data.loc[beginning_date:ending_date]
+    klines = pd.read_csv(filename)
+    klines["Date"] = pd.to_datetime(klines["Date"], utc=True)
+    mask = (klines["Date"] >= beginning_date) & (klines["Date"] <= ending_date)
+    return klines.loc[mask]
 
 
 def download_and_save_klines(symbol, interval, beginning_date, ending_date):
@@ -55,36 +113,28 @@ def download_and_save_klines(symbol, interval, beginning_date, ending_date):
     Returns:
         str: filename of csv file containing the klines
     """
-    from binance.client import Client
-
-    api_key = os.getenv("BINANCE_API_KEY", None)
-    api_secret = os.getenv("BINANCE_API_SECRET", None)
-    client = Client(api_key, api_secret)
-    print("downloading klines...", end="")
-    klines = client.get_historical_klines(
-        symbol,
-        interval,
-        beginning_date.strftime(FORMAT),
-        ending_date.strftime(FORMAT),
+    klines = yf.download(
+        tickers=symbol,
+        start=beginning_date,
+        end=ending_date,
+        interval=interval,
+        auto_adjust=True,
     )
-    print("done")
-    data = pd.DataFrame(klines, columns=KLINE_COLUMNS)
     filename = (
         "candlesticks/"
         + "_".join(
             [
-                symbol,
+                "-".join(symbol),
                 interval,
                 beginning_date.strftime(FORMAT),
                 ending_date.strftime(FORMAT),
             ]
         )
-        + ".csv"
+        + ".txt"
     )
-    data["Open time"] = pd.to_datetime(data["Open time"], unit="ms")
-    data["Close time"] = pd.to_datetime(data["Close time"], unit="ms")
-    data.set_index("Open time", inplace=True, drop=True)
-    data.to_csv(filename, sep=",", header=data.columns, index=True)
+    Path(filename).parent.mkdir(parents=True, exist_ok=True)
+    klines = concatenate_indicators(klines)
+    klines.to_csv(filename)
     return filename
 
 
@@ -107,35 +157,43 @@ def select_data(symbol, interval, beginning_date, ending_date):
     files = [x for x in p if x.is_file()]
     filenames = [x.stem.split("_") for x in files]
     df_files = pd.DataFrame(
-        filenames, columns=["ticker", "interval", "start_date", "end_date"]
+        filenames, columns=["symbol", "interval", "start_date", "end_date"]
     )
     df_files[["start_date", "end_date"]] = df_files[["start_date", "end_date"]].apply(
-        lambda x: pd.to_datetime(x, format=FORMAT)
+        lambda x: pd.to_datetime(x, format=FORMAT).dt.tz_localize("UTC")
     )
 
-    beginning_date = datetime(beginning_date.year, beginning_date.month, beginning_date.day)
-    ending_date = datetime(ending_date.year, ending_date.month, ending_date.day)
+    if isinstance(symbol, str):
+        symbol = [symbol]
+    symbol_to_string = "-".join(symbol)
+
+    beginning_date = datetime(
+        beginning_date.year, beginning_date.month, beginning_date.day, tzinfo=pytz.utc
+    )
+    ending_date = datetime(
+        ending_date.year, ending_date.month, ending_date.day, tzinfo=pytz.utc
+    )
 
     later_file = df_files[
-        (df_files["ticker"] == symbol) & (df_files["interval"] == interval) & (df_files["end_date"] > ending_date)
+        (df_files["symbol"] == symbol_to_string)
+        & (df_files["interval"] == interval)
+        & (df_files["end_date"] > ending_date)
     ]
     sooner_file = df_files[
-        (df_files["ticker"] == symbol) & (df_files["interval"] == interval) & (df_files["start_date"] < beginning_date)
+        (df_files["symbol"] == symbol_to_string)
+        & (df_files["interval"] == interval)
+        & (df_files["start_date"] < beginning_date)
     ]
 
     perfect_file = df_files[
-        (df_files["ticker"] == symbol) & (df_files["interval"] == interval)
-        & (
-            df_files["start_date"]
-            <= beginning_date
-        )
-        & (
-            df_files["end_date"]
-            >= ending_date
-        )
+        (df_files["symbol"] == symbol_to_string)
+        & (df_files["interval"] == interval)
+        & (df_files["start_date"] <= beginning_date)
+        & (df_files["end_date"] >= ending_date)
     ]
     useless_file = df_files[
-        (df_files["ticker"] == symbol) & (df_files["interval"] == interval)
+        (df_files["symbol"] == symbol_to_string)
+        & (df_files["interval"] == interval)
         & (df_files["start_date"] >= beginning_date)
         & (df_files["end_date"] <= ending_date)
     ]
@@ -162,3 +220,12 @@ def select_data(symbol, interval, beginning_date, ending_date):
         ending_date,
     )
     return select_klines_from_file(beginning_date, ending_date, new_filename)
+
+
+if __name__ == "__main__":
+    klines = select_data(
+        ["BTC-USD"],
+        "1d",
+        beginning_date=datetime.now() - timedelta(days=365),
+        ending_date=datetime.now(),
+    )
