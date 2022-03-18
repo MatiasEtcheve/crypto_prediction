@@ -6,7 +6,8 @@ import pytz
 import talib
 import yfinance as yf
 
-FORMAT = "%Y-%m-%d"
+# FORMAT = "%Y-%m-%d"
+FORMAT = "%d-%m-%Y"
 """Expected datetime format"""
 
 
@@ -89,12 +90,19 @@ def select_klines_from_file(beginning_date, ending_date, filename):
         pd.DataFrame: dataframe containing klines
     """
     klines = pd.read_csv(filename)
-    klines["Date"] = pd.to_datetime(klines["Date"], utc=True)
-    mask = (klines["Date"] >= beginning_date) & (klines["Date"] <= ending_date)
+    klines = klines.rename(columns={klines.columns[0]: "Datetime"})
+    klines["Datetime"] = pd.to_datetime(klines["Datetime"], utc=True)
+    mask = (klines["Datetime"] >= beginning_date) & (klines["Datetime"] <= ending_date)
     return klines.loc[mask]
 
 
-def download_and_save_klines(symbol, interval, beginning_date, ending_date):
+def download_and_save_klines(
+    symbol,
+    interval,
+    beginning_date,
+    ending_date,
+    directory=str(Path(__file__).resolve().parent),
+):
     """
     Downloads klines of `symbol` from `from_date` to `to_date`, at interval `interval`.
 
@@ -108,17 +116,61 @@ def download_and_save_klines(symbol, interval, beginning_date, ending_date):
         str: filename of csv file containing the klines
     """
     klines = yf.download(
-        tickers=symbol,
+        tickers=symbol + "-USD",
         start=beginning_date,
         end=ending_date,
         interval=interval,
         auto_adjust=True,
+        progress=True,
+        show_errors=False,
     )
+
+    if klines.empty:
+        from binance.client import Client
+
+        client = Client()
+        klines = client.get_historical_klines(
+            symbol + "USDT",
+            interval,
+            beginning_date.strftime(FORMAT),
+            ending_date.strftime(FORMAT),
+        )
+        klines = pd.DataFrame(
+            klines,
+            columns=[
+                "Datetime",
+                "Open",
+                "High",
+                "Low",
+                "Close",
+                "Volume",
+                "close_time",
+                "qav",
+                "num_trades",
+                "taker_base_vol",
+                "taker_quote_vol",
+                "ignore",
+            ],
+        ).drop(
+            labels=[
+                "close_time",
+                "qav",
+                "num_trades",
+                "taker_base_vol",
+                "taker_quote_vol",
+                "ignore",
+            ],
+            axis=1,
+        )
+        klines["Datetime"] = pd.to_datetime(klines["Datetime"], unit="ms")
+        klines = klines.set_index("Datetime")
+        klines = klines.astype("float64")
     filename = (
-        "candlesticks/"
+        directory
+        + "/candlesticks/"
         + "_".join(
             [
-                "-".join(symbol),
+                symbol,
                 interval,
                 beginning_date.strftime(FORMAT),
                 ending_date.strftime(FORMAT),
@@ -132,7 +184,13 @@ def download_and_save_klines(symbol, interval, beginning_date, ending_date):
     return filename
 
 
-def select_data(symbol, interval, beginning_date, ending_date):
+def select_data(
+    symbol,
+    interval,
+    beginning_date,
+    ending_date,
+    directory=Path(__file__).resolve().parent,
+):
     """
     Selects klines of `symbol` from `from_date` to `to_date`, at interval `interval`.
     If the klines have already been downloaded, it fetches it in the csv file.
@@ -147,7 +205,7 @@ def select_data(symbol, interval, beginning_date, ending_date):
     Returns:
         pd.DataFrame: dataframe containing klines
     """
-    p = (Path(__file__).resolve().parent / "candlesticks").glob("**/*")
+    p = (Path(directory) / "candlesticks").glob("**/*")
     files = [x for x in p if x.is_file()]
     filenames = [x.stem.split("_") for x in files]
     df_files = pd.DataFrame(
@@ -157,9 +215,9 @@ def select_data(symbol, interval, beginning_date, ending_date):
         lambda x: pd.to_datetime(x, format=FORMAT).dt.tz_localize("UTC")
     )
 
-    if isinstance(symbol, str):
-        symbol = [symbol]
-    symbol_to_string = "-".join(symbol)
+    # if isinstance(symbol, str):
+    #     symbol = [symbol]
+    # symbol_to_string = "-".join(symbol)
 
     beginning_date = datetime(
         beginning_date.year, beginning_date.month, beginning_date.day, tzinfo=pytz.utc
@@ -169,24 +227,24 @@ def select_data(symbol, interval, beginning_date, ending_date):
     )
 
     later_file = df_files[
-        (df_files["symbol"] == symbol_to_string)
+        (df_files["symbol"] == symbol)
         & (df_files["interval"] == interval)
         & (df_files["end_date"] > ending_date)
     ]
     sooner_file = df_files[
-        (df_files["symbol"] == symbol_to_string)
+        (df_files["symbol"] == symbol)
         & (df_files["interval"] == interval)
         & (df_files["start_date"] < beginning_date)
     ]
 
     perfect_file = df_files[
-        (df_files["symbol"] == symbol_to_string)
+        (df_files["symbol"] == symbol)
         & (df_files["interval"] == interval)
         & (df_files["start_date"] <= beginning_date)
         & (df_files["end_date"] >= ending_date)
     ]
     useless_file = df_files[
-        (df_files["symbol"] == symbol_to_string)
+        (df_files["symbol"] == symbol)
         & (df_files["interval"] == interval)
         & (df_files["start_date"] >= beginning_date)
         & (df_files["end_date"] <= ending_date)
@@ -212,14 +270,16 @@ def select_data(symbol, interval, beginning_date, ending_date):
         interval,
         beginning_date,
         ending_date,
+        directory,
     )
     return select_klines_from_file(beginning_date, ending_date, new_filename)
 
 
 if __name__ == "__main__":
     klines = select_data(
-        ["BTC-USD"],
+        "BTC",
         "1d",
-        beginning_date=datetime.now() - timedelta(days=365),
+        beginning_date=datetime.now() - timedelta(days=49),
         ending_date=datetime.now(),
+        directory="whateverthefuck/",
     )
