@@ -215,10 +215,6 @@ def select_data(
         lambda x: pd.to_datetime(x, format=FORMAT).dt.tz_localize("UTC")
     )
 
-    # if isinstance(symbol, str):
-    #     symbol = [symbol]
-    # symbol_to_string = "-".join(symbol)
-
     beginning_date = datetime(
         beginning_date.year, beginning_date.month, beginning_date.day, tzinfo=pytz.utc
     )
@@ -277,9 +273,11 @@ def select_data(
 
 if __name__ == "__main__":
     klines = select_data(
-        "BTC",
-        "1d",
-        beginning_date=datetime.now() - timedelta(days=49),
-        ending_date=datetime.now(),
+        "ATOM",
+        "6h",
+        beginning_date=datetime(2021, 2, 11),
+        ending_date=datetime(2021, 7, 13),
         directory="whateverthefuck/",
     )
+    klines = klines.dropna(axis=0)
+    print(klines)
