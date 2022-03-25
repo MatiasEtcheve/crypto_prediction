@@ -8,8 +8,6 @@ from pathlib import Path
 from typing import List, Tuple, Union
 
 import pandas as pd
-import torch
-import torch.nn as nn
 import wandb
 from sklearn.preprocessing import MinMaxScaler
 
