@@ -1,5 +1,7 @@
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -32,3 +34,21 @@ class ScriptCheckpoint(tf.keras.callbacks.Callback):
             filename_datamodule = Path(self.dirpath) / "datamodule_script.txt"
             with open(filename_datamodule, "w") as file:
                 file.write(inspect_code.get_class_code(type(self.datamodule)))
+
+
+@dataclass
+class Datapoint(object):
+    ticker: str = "BTC"
+    beginning_date: datetime = datetime.now()
+    ending_date: datetime = datetime.now()
+    df: pd.DataFrame = pd.DataFrame()
+    interval: str = "1d"
+    features: np.ndarray = np.empty(1)
+    labels: np.ndarray = np.empty(1)
+
+    def __post_init__(self):
+        assert len(self.features) == len(self.labels)
+        self.length = len(self.features)
+
+    def isempty(self):
+        return len(self.features) == 0
