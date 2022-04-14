@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  visualization-streamlit:
+    container_name: visualization-container
+    build: ./
+    ports:
+      - '8501:8501'
+    environment:
+      - TESTNET_API=${TESTNET_API}
+      - TESTNET_SECRET=${TESTNET_SECRET}
+    volumes:
+      - '../:/root/crypto-prediction'
+    tty: true
+    entrypoint: ["/bin/bash"]
+    # command: ["cd /root/crypto-prediction", "pip install -r visualization/requirements.txt"]
