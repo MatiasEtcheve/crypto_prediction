@@ -209,9 +209,7 @@ class PastPortfolio(object):
             self.current_values,
         ) = self.get_current_portfolio_amount_value()
 
-        self.tickers = [
-            "ETH", "BTC", "BNB", "LTC", "XRP", "TRX"
-        ]
+        self.tickers = ["ETH", "BTC", "BNB", "LTC", "XRP", "TRX"]
 
         self.earliest_date = self.compute_earliest_date()
 

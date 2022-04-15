@@ -3,10 +3,9 @@ from pathlib import Path
 
 import pandas as pd
 import pytz
-import talib
 import yfinance as yf
 
-import vectorbt as vbt
+# import vectorbt as vbt
 
 # FORMAT = "%Y-%m-%d"
 FORMAT = "%d-%m-%Y"
@@ -34,7 +33,7 @@ def select_klines_from_file(beginning_date, ending_date, filename, type="csv"):
         )
         return klines.loc[mask]
     elif type == "vbt":
-        klines = vbt.Data.load(filename)
+        # klines = vbt.Data.load(filename)
         return klines.loc[beginning_date:ending_date]
 
 
@@ -42,12 +41,13 @@ def download_klines(
     symbol, interval, beginning_date, ending_date, compute_metrics=None, type="csv"
 ):
     if type == "vbt":
-        klines = vbt.BinanceData.download(
-            [s + "USDT" for s in symbol],
-            start=beginning_date,
-            end=ending_date,
-            interval=interval,
-        )
+        pass
+        # klines = vbt.BinanceData.download(
+        #     [s + "USDT" for s in symbol],
+        #     start=beginning_date,
+        #     end=ending_date,
+        #     interval=interval,
+        # )
     elif type == "csv":
         assert (
             isinstance(symbol, str) or len(symbol) == 1
