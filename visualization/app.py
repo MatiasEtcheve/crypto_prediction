@@ -23,6 +23,7 @@ from past_portfolio import PastPortfolio
 qs.extend_pandas()
 testnet = True
 
+reload_cache = st.button(label="Reload cache", on_click=st.experimental_memo.clear)
 
 network = st.radio(
     label="Select network",

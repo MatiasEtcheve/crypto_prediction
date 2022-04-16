@@ -59,6 +59,7 @@ class ClassificationPortfolio(portfolio.Portfolio):
         return np.array(probabilities)
 
     def trade(self, money: int):
+        os.system("/bin/bash -c 'ntpdate pool.ntp.org'")
         self.cancel_orders()
         probabilities = self.compute_probabilities()
         directions = probabilities > 0.5
@@ -106,7 +107,7 @@ pf = ClassificationPortfolio(
 async def kline_listener(aclient):
     bm = BinanceSocketManager(aclient)
     input_coroutines = [
-        asset.kline_listener(bm, interval="1m") for asset in list(pf.assets.values())
+        asset.kline_listener(bm, interval="5m") for asset in list(pf.assets.values())
     ]
     await asyncio.gather(*input_coroutines, return_exceptions=True)
     print("Finally gathered at:", datetime.now())
