@@ -12,6 +12,11 @@ services:
       - TESTNET_SECRET=${TESTNET_SECRET}
       - BINANCE_WATCH_API=${BINANCE_WATCH_API}
       - BINANCE_WATCH_SECRET=${BINANCE_WATCH_SECRET}
+#    deploy:
+#      resources:
+#        limits:
+#                #cpus: 0.25
+#          memory: 256M
     volumes:
       - "../:/root/crypto-prediction"
     tty: true

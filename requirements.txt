@@ -31,8 +31,8 @@ seaborn==0.11.2
 streamlit==1.8.1
 ta==0.9.0
 TA_Lib==0.4.23
-tensorflow==2.8.0
-torch==1.10.2
+# tensorflow==2.8.0
+# torch==1.10.2
 tqdm==4.62.3
 typing_extensions==4.1.1
 wandb==0.12.11
