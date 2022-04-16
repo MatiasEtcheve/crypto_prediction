@@ -1,0 +1,2 @@
+symbol,id,orderId,orderListId,price,qty,quoteQty,commission,commissionAsset,time,isBuyer,isMaker,isBestMatch
+BNBBUSD,41858,453656,-1,415.0,13.3,5519.5,0.0,BUSD,1650117068690,False,False,True

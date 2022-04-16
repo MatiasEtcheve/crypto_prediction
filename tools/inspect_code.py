@@ -2,24 +2,7 @@ import inspect
 import sys
 
 import numpy as np
-import torch
 from IPython.core.magics.code import extract_symbols
-
-
-def set_seed(seed: int):
-    """Sets the seed of all random operation in `numpy` and `pytorch`
-
-    Warning:
-        `pandas` does not have any fixed seed.
-
-    Args:
-        seed (int): seed to set to have reproducible results.
-    """
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():  # GPU operation have separate seed
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
 
 
 def new_getfile(object, _old_getfile=inspect.getfile):
