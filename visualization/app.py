@@ -1,23 +1,9 @@
+import os
 import sys
 from calendar import month
-from pathlib import Path
-
-IS_COLAB = "google.colab" in sys.modules
-IS_KAGGLE = "kaggle_secrets" in sys.modules
-if IS_KAGGLE:
-    repo_path = Path("../input/crypto-prediction")
-elif IS_COLAB:
-    from google.colab import drive
-
-    drive.mount("/content/gdrive")
-    repo_path = Path("/content/gdrive/MyDrive/crypto-prediction")
-else:
-    repo_path = Path("/home/matias/crypto-prediction")
-sys.path.append(str(repo_path))
-
-import os
 from datetime import date, datetime, timedelta
 from importlib import reload
+from pathlib import Path
 from pprint import pprint
 from time import time
 
@@ -32,10 +18,7 @@ import streamlit as st
 from binance.client import Client
 
 qs.extend_pandas()
-
-api_key = os.environ.get("TESTNET_API")
-api_secret = os.environ.get("TESTNET_SECRET")
-client = Client(api_key, api_secret, testnet=True)
+testnet = True
 
 
 class PastAsset(object):
@@ -316,7 +299,7 @@ class PastPortfolio(object):
     def get_current_portfolio_amount_value(self):
         amount = {}
         value = {}
-        for balance in client.get_account()["balances"]:
+        for balance in self.client.get_account()["balances"]:
             if balance["asset"] in ["BUSD", "USDT"]:
                 value[balance["asset"]] = float(balance["free"]) + float(
                     balance["locked"]
@@ -331,6 +314,12 @@ class PastPortfolio(object):
             amount[balance["asset"]] = float(balance["free"]) + float(balance["locked"])
         return amount, value
 
+
+network = st.radio(
+    label="Select network",
+    options=["Binance", "Testnet"],
+    index=1,
+)
 
 col1, col2 = st.columns(2)
 
@@ -382,11 +371,18 @@ if st.session_state["period"] == "All":
 
 
 @st.experimental_memo
-def load_portfolio(interval):
+def load_portfolio(network, interval):
+    if network == "Testnet":
+        api_key = os.environ.get("TESTNET_API")
+        api_secret = os.environ.get("TESTNET_SECRET")
+    elif network == "Binance":
+        api_key = os.environ.get("BINANCE_WATCH_API")
+        api_secret = os.environ.get("BINANCE_WATCH_SECRET")
+    client = Client(api_key, api_secret, testnet=network == "Testnet")
     return PastPortfolio(client, interval)
 
 
-pf = load_portfolio(st.session_state["interval"])
+pf = load_portfolio(network, st.session_state["interval"])
 st.write("First trade at:", pf.trades.index.get_level_values(1).min())
 st.write("Last trade at:", pf.trades.index.get_level_values(1).max())
 

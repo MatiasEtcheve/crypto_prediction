@@ -49,13 +49,14 @@ def download_klines(
         #     interval=interval,
         # )
     elif type == "csv":
+        print(ending_date, ending_date.astimezone(pytz.timezone("Europe/Paris")))
         assert (
             isinstance(symbol, str) or len(symbol) == 1
         ), f"Symbol can't be a list in a csv, but it is {symbol}"
         klines = yf.download(
             tickers=symbol + "-USD",
-            start=beginning_date.astimezone(pytz.timezone("Europe/Paris")),
-            end=ending_date.astimezone(pytz.timezone("Europe/Paris")),
+            start=beginning_date,
+            end=ending_date,
             interval=interval,
             progress=True,
             show_errors=True,
