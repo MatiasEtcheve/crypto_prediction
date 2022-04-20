@@ -1,4 +1,5 @@
 import os
+import pickle
 import sys
 from calendar import month
 from datetime import date, datetime, timedelta
@@ -15,10 +16,25 @@ import plotly.graph_objects as go
 import pytz
 import quantstats as qs
 import streamlit as st
+import wandb
 from binance.client import Client
+from datasets.portfolios import PastPortfolio
+from tools import inspect_code, plotting, training, wandb_api
 
-from past_asset import PastAsset, PastQuote
-from past_portfolio import PastPortfolio
+saving_path = Path(__file__).resolve().parent
+root_path = Path(__file__).resolve().parent / "tmp"
+starting_date = datetime.now()
+
+wandb_api.login()
+api = wandb.Api()
+run_name = "1fullt5y"
+run = api.run(f"matiasetcheverry/crypto-prediction/{run_name}")
+config = run.config
+model = run.file("rf.pkl")
+model = model.download(root=root_path / run.name, replace=True)
+with open(model.name, "rb") as file:
+    rf = pickle.load(file)
+
 
 qs.extend_pandas()
 testnet = True
@@ -81,7 +97,7 @@ if st.session_state["period"] == "All":
 
 
 @st.experimental_memo
-def load_portfolio(network, interval):
+def load_portfolio(network, interval, beginning_date, ending_date):
     if network == "Testnet":
         api_key = os.environ.get("TESTNET_API")
         api_secret = os.environ.get("TESTNET_SECRET")
@@ -89,15 +105,35 @@ def load_portfolio(network, interval):
         api_key = os.environ.get("BINANCE_WATCH_API")
         api_secret = os.environ.get("BINANCE_WATCH_SECRET")
     client = Client(api_key, api_secret, testnet=network == "Testnet")
-    return PastPortfolio(client, interval)
+    config = {"interval": interval}
+    return PastPortfolio.from_tickers(
+        client,
+        config,
+        ["ETH", "BTC", "BNB", "LTC", "XRP", "TRX"],
+        beginning_date,
+        ending_date,
+    )
 
 
-pf = load_portfolio(network, st.session_state["interval"])
+pf = load_portfolio(network, st.session_state["interval"], beginning_date, ending_date)
 st.write("First trade at:", pf.trades.index.get_level_values(1).min())
 st.write("Last trade at:", pf.trades.index.get_level_values(1).max())
+st.write("Current amount", pf.current_amounts)
+st.write("Initial amount", pf.initial_amounts)
 
-klines = pf.klines(beginning_date, ending_date)
-returns = pf.returns(beginning_date, ending_date)
+# for asset in pf.assets.values():
+#     print(asset.ticker)
+#     try:
+#         proba = asset.predict_proba_last_from(rf)
+#         print("PROBA", proba)
+#     except ValueError as e:
+#         print(f"Problem predicting on {asset.ticker}")
+#         print(f"\t{e}")
+
+#     print(asset.df.index[-1])
+
+klines = pf.klines
+returns = pf.returns
 returns.index = returns.index.tz_localize(None)
 
 ticker = st.selectbox(

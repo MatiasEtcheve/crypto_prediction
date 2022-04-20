@@ -49,7 +49,6 @@ def download_klines(
         #     interval=interval,
         # )
     elif type == "csv":
-        print(ending_date, ending_date.astimezone(pytz.timezone("Europe/Paris")))
         assert (
             isinstance(symbol, str) or len(symbol) == 1
         ), f"Symbol can't be a list in a csv, but it is {symbol}"
@@ -60,14 +59,19 @@ def download_klines(
             interval=interval,
             progress=True,
             show_errors=True,
-            prepost=True,
-        )
+            prepost=False,
+        ).iloc[:-1]
+
         try:
             klines.index = klines.index.tz_convert(pytz.UTC).rename("Datetime")
         except TypeError as e:
             klines.index = klines.index.tz_localize(pytz.UTC).rename("Datetime")
         except AttributeError as e:
             pass
+        klines = klines.drop(
+            labels=["Adj Close"],
+            axis=1,
+        )
         if klines.empty:
             from binance.client import Client
 
@@ -77,7 +81,7 @@ def download_klines(
                 interval,
                 str(beginning_date.timestamp() * 1000),
                 str(ending_date.timestamp() * 1000),
-            )
+            )[:-1]
             klines = pd.DataFrame(
                 klines,
                 columns=[

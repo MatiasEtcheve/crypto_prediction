@@ -1,0 +1,2 @@
+symbol,id,orderId,orderListId,price,qty,quoteQty,commission,commissionAsset,time,isBuyer,isMaker,isBestMatch
+XRPBUSD,65963,470024,-1,0.7482,385.1,288.13182,0.0,XRP,1650484823337,True,True,True
