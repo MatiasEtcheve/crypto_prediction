@@ -57,7 +57,7 @@ with col1:
     if st.session_state["period"] == "Custom":
         beginning_date = st.date_input(
             label="Beginning date",
-            value=date(2022, 4, 7),
+            value=date(2022, 4, 8),
             key="beginning_date",
         )
 
@@ -105,6 +105,13 @@ def load_portfolio(network, interval, beginning_date, ending_date):
 pf = load_portfolio(network, st.session_state["interval"], beginning_date, ending_date)
 st.write("First trade at:", pf.trades.index.get_level_values(1).min())
 st.write("Last trade at:", pf.trades.index.get_level_values(1).max())
+st.write(
+    "Last orders at:",
+    pf.orders.max(level=0).loc[
+        :,
+        ["time", "price", "origQty", "executedQty", "status", "side"],
+    ],
+)
 st.write("Current amount", pf.current_amounts)
 st.write("Initial amount", pf.initial_amounts)
 
