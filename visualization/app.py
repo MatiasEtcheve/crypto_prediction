@@ -16,25 +16,12 @@ import plotly.graph_objects as go
 import pytz
 import quantstats as qs
 import streamlit as st
-import wandb
 from binance.client import Client
 from datasets.portfolios import PastPortfolio
-from tools import inspect_code, plotting, training, wandb_api
 
 saving_path = Path(__file__).resolve().parent
 root_path = Path(__file__).resolve().parent / "tmp"
 starting_date = datetime.now()
-
-wandb_api.login()
-api = wandb.Api()
-run_name = "1fullt5y"
-run = api.run(f"matiasetcheverry/crypto-prediction/{run_name}")
-config = run.config
-model = run.file("rf.pkl")
-model = model.download(root=root_path / run.name, replace=True)
-with open(model.name, "rb") as file:
-    rf = pickle.load(file)
-
 
 qs.extend_pandas()
 testnet = True
