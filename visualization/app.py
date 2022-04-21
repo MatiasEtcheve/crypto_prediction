@@ -209,4 +209,13 @@ st.pyplot(returns.plot_drawdown(show=False))
 st.pyplot(returns.plot_snapshot(show=False))
 st.pyplot(returns.plot_distribution(show=False))
 
-st.pyplot(returns.plot_histogram(resample="W", show=False))
+st.pyplot(returns.plot_histogram(resample="D", show=False))
+
+
+st.title("Log")
+
+with open(
+    Path(__file__).resolve().parents[1] / "live_trading" / "first_strategy" / "log.txt"
+) as log_file:
+    lines = log_file.readlines()
+    st.write("\n".join(lines[-50:]))
