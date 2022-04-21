@@ -18,13 +18,11 @@ import quantstats as qs
 import streamlit as st
 from binance.client import Client
 from datasets.portfolios import PastPortfolio
-
-saving_path = Path(__file__).resolve().parent
-root_path = Path(__file__).resolve().parent / "tmp"
-starting_date = datetime.now()
+from plotly.subplots import make_subplots
 
 qs.extend_pandas()
 testnet = True
+st.set_page_config(layout="wide")
 
 reload_cache = st.button(label="Reload cache", on_click=st.experimental_memo.clear)
 
@@ -103,31 +101,39 @@ def load_portfolio(network, interval, beginning_date, ending_date):
 
 
 pf = load_portfolio(network, st.session_state["interval"], beginning_date, ending_date)
-st.write("First trade at:", pf.trades.index.get_level_values(1).min())
-st.write("Last trade at:", pf.trades.index.get_level_values(1).max())
+st.write(
+    "Last trades at:",
+    pf.trades.groupby(level=0)
+    .max()
+    .loc[
+        :,
+        [
+            "time",
+            "orderId",
+            "price",
+            "qty",
+            "commission",
+            "isBuyer",
+            "amountAdded",
+        ],
+    ]
+    .sort_index(),
+)
+
 st.write(
     "Last orders at:",
-    pf.orders.max(level=0).loc[
+    pf.orders.groupby(level=0)
+    .max()
+    .loc[
         :,
-        ["time", "price", "origQty", "executedQty", "status", "side"],
-    ],
+        ["time", "orderId", "price", "origQty", "executedQty", "status", "side"],
+    ]
+    .sort_index(),
 )
-st.write("Current amount", pf.current_amounts)
-st.write("Initial amount", pf.initial_amounts)
-
-# for asset in pf.assets.values():
-#     print(asset.ticker)
-#     try:
-#         proba = asset.predict_proba_last_from(rf)
-#         print("PROBA", proba)
-#     except ValueError as e:
-#         print(f"Problem predicting on {asset.ticker}")
-#         print(f"\t{e}")
-
-#     print(asset.df.index[-1])
 
 klines = pf.klines
 returns = pf.returns
+orders = pf.orders.loc[:, beginning_date:ending_date, :]
 returns.index = returns.index.tz_localize(None)
 
 ticker = st.selectbox(
@@ -137,8 +143,55 @@ ticker = st.selectbox(
     index=1,
 )
 
+
 if st.session_state["ticker"] in list(klines.index.get_level_values(0).unique()):
-    fig = px.line(klines.loc[st.session_state["ticker"]], y="value")
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    sell_mask = orders.loc[st.session_state["ticker"]]["side"] == "SELL"
+    sell_orders = orders.loc[st.session_state["ticker"]].loc[sell_mask]
+
+    buy_mask = orders.loc[st.session_state["ticker"]]["side"] == "BUY"
+    buy_orders = orders.loc[st.session_state["ticker"]].loc[sell_mask]
+    fig.add_trace(
+        go.Scatter(
+            x=klines.loc[st.session_state["ticker"]].index,
+            y=klines.loc[st.session_state["ticker"]]["value"],
+            name="value",
+        ),
+        secondary_y=True,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=pf.assets[st.session_state["ticker"]].df.index,
+            y=pf.assets[st.session_state["ticker"]].df["Open"],
+            name="Open price",
+        ),
+        secondary_y=False,
+    )
+    size = 12
+    fig.add_trace(
+        go.Scatter(
+            x=sell_orders["time"],
+            y=sell_orders["price"],
+            name="sell orders",
+            mode="markers",
+            marker=dict(
+                symbol="triangle-down",
+                size=size,
+            ),
+        ),
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=buy_orders["time"],
+            y=buy_orders["price"],
+            name="buy orders",
+            mode="markers",
+            marker=dict(
+                symbol="triangle-up",
+                size=size,
+            ),
+        ),
+    )
 elif st.session_state["ticker"] == "RETURN":
     fig = px.line(returns)
 elif st.session_state["ticker"] == "SUM":
@@ -154,3 +207,6 @@ st.plotly_chart(fig)
 st.write(returns.plot_monthly_heatmap(show=False))
 st.pyplot(returns.plot_drawdown(show=False))
 st.pyplot(returns.plot_snapshot(show=False))
+st.pyplot(returns.plot_distribution(show=False))
+
+st.pyplot(returns.plot_histogram(resample="W", show=False))

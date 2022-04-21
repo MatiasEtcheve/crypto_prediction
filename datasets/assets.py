@@ -405,6 +405,7 @@ class PastAsset(LiveAsset):
         self.current_amount = self._get_current_amount_value()
         self.trades = self.get_all_trades()
         self.orders = self.get_all_orders()
+        self.orders = self.orders.set_index(keys="time", drop=False)
         self.compute_klines()
 
     def _get_all(self, limit, object_to_call):
