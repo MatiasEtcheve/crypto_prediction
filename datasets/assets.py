@@ -447,6 +447,7 @@ class PastAsset(LiveAsset):
         return self._get_all(limit, "trades")
 
     def get_all_orders(self, limit=1000):
+        print(self.client.get_open_orders(symbol=self.ticker + "BUSD"))
         return self._get_all(limit, "orders")
 
     def is_file_empty(self, file_name):

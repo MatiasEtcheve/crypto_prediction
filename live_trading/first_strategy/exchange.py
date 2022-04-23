@@ -4,9 +4,11 @@ import os
 import pickle
 import time
 from datetime import datetime, timedelta
+from distutils.log import ERROR
 from importlib import reload
 from pathlib import Path
 from pprint import pprint
+from tkinter.messagebox import INFO
 
 import datasets.assets as assets
 import datasets.portfolios as portfolios
@@ -36,7 +38,6 @@ with open(model.name, "rb") as file:
 def get_logger(name):
     logger = logging.getLogger(name)
     if not logger.handlers:
-        # Prevent logging from propagating to the root logger
         logger.propagate = 0
         console = logging.FileHandler("log.txt")
         logger.addHandler(console)
@@ -48,7 +49,11 @@ def get_logger(name):
 
 
 logger = get_logger(__name__)
-# logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.DEBUG)
+# ERROR
+# WARNING
+# INFO
+# DEBUG
 
 
 class ClassificationPortfolio(portfolios.LivePortfolio):
@@ -82,7 +87,7 @@ class ClassificationPortfolio(portfolios.LivePortfolio):
         # os.system("/bin/bash -c 'ntpdate pool.ntp.org'")
         self.cancel_orders()
         probabilities = self.compute_probabilities()
-        directions = probabilities > 5
+        directions = probabilities > 0.5
         allocated_money = self.compute_amount_money(
             money,
             directions,
@@ -127,7 +132,7 @@ pf = ClassificationPortfolio.from_tickers(
 async def kline_listener(aclient):
     bm = BinanceSocketManager(aclient)
     input_coroutines = [
-        asset.kline_listener(bm, interval="1d") for asset in list(pf.assets.values())
+        asset.kline_listener(bm, interval="1m") for asset in list(pf.assets.values())
     ]
     await asyncio.gather(*input_coroutines, return_exceptions=True)
     logger.info("klines gathered")

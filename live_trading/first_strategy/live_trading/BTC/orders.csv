@@ -1,0 +1,3 @@
+symbol,orderId,orderListId,clientOrderId,price,origQty,executedQty,cummulativeQuoteQty,status,timeInForce,type,side,stopPrice,icebergQty,time,updateTime,isWorking,origQuoteOrderQty
+BTCBUSD,2077566,-1,fHggYywAHRTME1nx2RlJje,39495.33,2.518062,0.0,0.0,NEW,GTC,LIMIT,BUY,0.0,0.0,1650680812761,1650680812761,True,0.0
+BTCBUSD,2077567,-1,4Fx7INyim5YumPJLB7TTWp,39530.66000000,0.85307200,0.00000000,0.00000000,NEW,GTC,LIMIT,BUY,0.00000000,0.00000000,1650680827239,1650680827239,True,0.00000000

@@ -1,0 +1,2 @@
+symbol,orderId,orderListId,clientOrderId,price,origQty,executedQty,cummulativeQuoteQty,status,timeInForce,type,side,stopPrice,icebergQty,time,updateTime,isWorking,origQuoteOrderQty
+XRPBUSD,484216,-1,d6fL72bB8fHvlPMNDpLQ0k,0.7181,90000.0,0.0,0.0,NEW,GTC,LIMIT,BUY,0.0,0.0,1650680814680,1650680814680,True,0.0

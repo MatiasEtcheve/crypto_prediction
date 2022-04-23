@@ -131,6 +131,10 @@ st.write(
     .sort_index(),
 )
 
+st.write(
+    "Balances",
+    pd.DataFrame.from_dict(pf.current_amounts, orient="index", columns=["amount"]),
+)
 klines = pf.klines
 returns = pf.returns
 orders = pf.orders.loc[:, beginning_date:ending_date, :]
