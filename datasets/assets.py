@@ -251,7 +251,7 @@ class LiveAsset(TrainAsset):
                     f"Can't sell {self.ticker} dust:\n\tAmount: {e.amount}\tPrice: {e.price}\n\tMin notional: {e.min_notional}\tNotional: {e.notional}"
                 )
             except Exception as e:
-            logger.error(f"{type(e)}: {str(e)}")
+                logger.error(f"{type(e)}: {str(e)}")
             else:
                 return orders
         return None
