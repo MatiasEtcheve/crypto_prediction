@@ -1,4 +1,4 @@
-class FilterException(Exception):
+class FilterException(BaseException):
     def __init__(self, message="", **kwargs):
         self.__dict__.update(kwargs)
         Exception.__init__(self, message)

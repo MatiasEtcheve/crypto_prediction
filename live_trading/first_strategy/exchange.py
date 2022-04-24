@@ -101,6 +101,9 @@ class ClassificationPortfolio(portfolios.LivePortfolio):
             logger.info(
                 f"prediction: ticker: {asset.ticker}, probability: {probability}, side: {direction}, money: {money}"
             )
+            print(
+                f"prediction: ticker: {asset.ticker}, probability: {probability}, side: {direction}, money: {money}"
+            )
 
         for index, asset in enumerate(self.assets.values()):
             probability = probabilities[index]
@@ -110,6 +113,9 @@ class ClassificationPortfolio(portfolios.LivePortfolio):
             if orders is not None:
                 for order in orders:
                     logger.info(
+                        f"order: {order['symbol']}, side: {order['side']}, proba: {probability}, money allocated: {float(order['origQty'])*float(order['price'])}"
+                    )
+                    print(
                         f"order: {order['symbol']}, side: {order['side']}, proba: {probability}, money allocated: {float(order['origQty'])*float(order['price'])}"
                     )
                     order_ids.append(

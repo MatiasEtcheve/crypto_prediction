@@ -141,20 +141,20 @@ class LiveAsset(TrainAsset):
         for filter in filters:
             if filter["filterType"] == "PRICE_FILTER":
                 if float(filter["minPrice"]) > price:
-                    raise LowPriceFilterException
+                    raise LowPriceFilterException()
                 if float(filter["maxPrice"]) < price:
-                    raise HighPriceFilterException
+                    raise HighPriceFilterException()
             if filter["filterType"] == "PERCENT_PRICE":
                 avg_price = float(self.client.get_avg_price(symbol=ticker)["price"])
                 if price > float(filter["multiplierUp"]) * avg_price:
-                    raise HighPercentPriceException
+                    raise HighPercentPriceException()
                 if price < float(filter["multiplierDown"]) * avg_price:
-                    raise LowPercentPriceException
+                    raise LowPercentPriceException()
             if filter["filterType"] == "LOT_SIZE":
                 if amount > float(filter["maxQty"]):
                     raise HighSizeException(max_amount=float(filter["maxQty"]))
                 if amount < float(filter["minQty"]):
-                    raise LowSizeException
+                    raise LowSizeException()
             if filter["filterType"] == "MIN_NOTIONAL":
                 if filter["applyToMarket"] and price * amount < float(
                     filter["minNotional"]
@@ -250,6 +250,8 @@ class LiveAsset(TrainAsset):
                 logger.error(
                     f"Can't sell {self.ticker} dust:\n\tAmount: {e.amount}\tPrice: {e.price}\n\tMin notional: {e.min_notional}\tNotional: {e.notional}"
                 )
+            except Exception as e:
+            logger.error(f"{type(e)}: {str(e)}")
             else:
                 return orders
         return None
@@ -269,6 +271,8 @@ class LiveAsset(TrainAsset):
             )
         except LowSizeException as e:
             logger.error(f"Can't buy {self.ticker} dust:\nLow size error")
+        except Exception as e:
+            logger.error(f"{type(e)}: {str(e)}")
         else:
             return orders
         return None
@@ -511,10 +515,10 @@ class PastQuote(PastAsset):
         self.compute_klines()
 
     def get_last_trades(self):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def get_last_orders(self):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def compute_klines(self):
         if len(self.trades) == 0:
