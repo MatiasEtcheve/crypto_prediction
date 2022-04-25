@@ -410,6 +410,9 @@ class PastAsset(LiveAsset):
         self.trades = self.get_all_trades()
         self.orders = self.get_all_orders()
         self.orders = self.orders.set_index(keys="time", drop=False)
+        self.trades = self.trades.set_index(keys="time", drop=False)
+        self.trades = self.trades.sort_index()
+        self.orders = self.orders.sort_index()
         self.compute_klines()
 
     def _get_all(self, limit, object_to_call):
@@ -451,7 +454,6 @@ class PastAsset(LiveAsset):
         return self._get_all(limit, "trades")
 
     def get_all_orders(self, limit=1000):
-        print(self.client.get_open_orders(symbol=self.ticker + "BUSD"))
         return self._get_all(limit, "orders")
 
     def is_file_empty(self, file_name):
@@ -467,7 +469,6 @@ class PastAsset(LiveAsset):
         if len(self.trades) == 0:
             return []
 
-        self.trades = self.trades.set_index(keys="time", drop=False)
         self.trades["amountAdded"] = self.trades["qty"] * (
             2 * self.trades["isBuyer"] - 1
         )
@@ -489,10 +490,9 @@ class PastAsset(LiveAsset):
             self.initial_amount + self.klines["amountAdded"].cumsum()
         )
         self.klines["value"] = self.klines["amount"] * self.klines["price"]
-
-        self.klines = self.klines[np.isnan(self.klines["trades"])].drop(
-            labels=["trades", "price"], axis=1
-        )
+        # self.klines = self.klines[np.isnan(self.klines["trades"])].drop(
+        #     labels=["trades", "price"], axis=1
+        # )
         self.df = self.df.drop(labels=["price", "amountAdded"], axis=1)
 
 
@@ -545,7 +545,7 @@ class PastQuote(PastAsset):
         )
         self.klines["value"] = self.klines["amount"] * self.klines["price"]
 
-        self.klines = self.klines[np.isnan(self.klines["trades"])].drop(
-            labels=["trades", "price"], axis=1
-        )
+        # self.klines = self.klines[np.isnan(self.klines["trades"])].drop(
+        #     labels=["trades", "price"], axis=1
+        # )
         self.df = self.df.drop(labels=["price", "amountAdded"], axis=1)

@@ -125,8 +125,8 @@ class LivePortfolio(object):
             assets.append(
                 LiveAsset(
                     asset.ticker,
-                    asset.df,
-                    asset.labels,
+                    asset.df.iloc[:-1],
+                    asset.labels.iloc[:-1],
                     client,
                     config["interval"],
                     utils._concatenate_indicators,
@@ -185,11 +185,8 @@ class PastPortfolio(LivePortfolio):
             set(self.quote.klines.index),
         )
         klines = pd.concat(
-            [
-                asset.klines.loc[common_dates].sort_index()
-                for asset in self.assets.values()
-            ]
-            + [self.quote.klines.loc[common_dates].sort_index()],
+            [asset.klines.loc[common_dates] for asset in self.assets.values()]
+            + [self.quote.klines.loc[common_dates]],
             keys=self.tickers + ["BUSD"],
             axis=0,
         )
@@ -203,30 +200,15 @@ class PastPortfolio(LivePortfolio):
                     [somme],
                     keys=["SUM"],
                 ),
-                klines,
+                pd.concat(
+                    [asset.klines for asset in self.assets.values()]
+                    + [self.quote.klines],
+                    keys=self.tickers + ["BUSD"],
+                    axis=0,
+                ),
             ]
         )
         self.returns = self.klines.loc["SUM"]["value"].pct_change()
-
-    # def klines(self, beginning_date, ending_date=datetime.now()):
-    #     if beginning_date is None:
-    #         beginning_date = self.earliest_date
-
-    #     beginning_date = self._cast_date(beginning_date)
-    #     ending_date = self._cast_date(ending_date)
-
-    #     self._klines = self._klines.sort_index()
-    #     return self._klines.loc[pd.IndexSlice[:, beginning_date:ending_date], :]
-
-    # def returns(self, beginning_date, ending_date=datetime.now()):
-    #     if beginning_date is None:
-    #         beginning_date = self.earliest_date
-
-    #     beginning_date = self._cast_date(beginning_date)
-    #     ending_date = self._cast_date(ending_date)
-
-    #     self._returns = self._returns.sort_index()
-    #     return self._returns.loc[beginning_date:ending_date]
 
     @classmethod
     def from_tickers(cls, client, config, asset_tickers, beginning_date, ending_date):

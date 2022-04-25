@@ -138,7 +138,7 @@ pf = ClassificationPortfolio.from_tickers(
 async def kline_listener(aclient):
     bm = BinanceSocketManager(aclient)
     input_coroutines = [
-        asset.kline_listener(bm, interval="1m") for asset in list(pf.assets.values())
+        asset.kline_listener(bm, interval="1d") for asset in list(pf.assets.values())
     ]
     await asyncio.gather(*input_coroutines, return_exceptions=True)
     logger.info("klines gathered")

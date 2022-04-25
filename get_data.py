@@ -59,9 +59,7 @@ def download_klines(
             interval=interval,
             progress=True,
             show_errors=True,
-            prepost=False,
-        ).iloc[:-1]
-
+        )
         try:
             klines.index = klines.index.tz_convert(pytz.UTC).rename("Datetime")
         except TypeError as e:
@@ -72,7 +70,8 @@ def download_klines(
             labels=["Adj Close"],
             axis=1,
         )
-        if klines.empty:
+        klines = klines.astype("float64")
+        if True or klines.empty:
             from binance.client import Client
 
             client = Client()
@@ -81,7 +80,7 @@ def download_klines(
                 interval,
                 str(beginning_date.timestamp() * 1000),
                 str(ending_date.timestamp() * 1000),
-            )[:-1]
+            )
             klines = pd.DataFrame(
                 klines,
                 columns=[
@@ -114,7 +113,7 @@ def download_klines(
                 klines["Datetime"], unit="ms"
             ).dt.tz_localize(pytz.UTC)
             klines = klines.set_index("Datetime")
-            klines = klines.astype("float64")
+            klines = klines.astype("float32")
         if compute_metrics is not None:
             klines = compute_metrics(klines)
     return klines

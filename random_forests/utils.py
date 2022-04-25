@@ -88,6 +88,8 @@ class DataModule:
             )
             if dp == []:
                 continue
+            dp.df = dp.df.dropna()
+            dp.labels = dp.labels.loc[dp.df.index]
             train_val_size = int(len(dp.df) * train_val_ratio)
             test_dp = assets.TrainAsset(
                 ticker=input["ticker"],
@@ -141,10 +143,10 @@ def create_asset(ticker, interval, beginning_date, ending_date, compute_metrics)
     # else:
     # data = data.dropna(axis=0)
     data = data.replace(
-        to_replace=[np.inf, -np.inf, np.float64("inf"), -np.float64("inf")],
+        to_replace=[np.inf, -np.inf, np.float32("inf"), -np.float32("inf")],
         value=0,
     )
-    labels = data.pop("Direction").to_numpy()
+    labels = data.pop("Direction")
 
     return assets.TrainAsset(
         ticker=ticker,
@@ -153,3 +155,7 @@ def create_asset(ticker, interval, beginning_date, ending_date, compute_metrics)
         interval=interval,
         compute_metrics=compute_metrics,
     )
+
+
+def dropna(dp):
+

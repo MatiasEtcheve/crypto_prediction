@@ -17,6 +17,7 @@ import pytz
 import quantstats as qs
 import streamlit as st
 from binance.client import Client
+from datasets import assets, portfolios
 from datasets.portfolios import PastPortfolio
 from plotly.subplots import make_subplots
 
@@ -101,10 +102,12 @@ def load_portfolio(network, interval, beginning_date, ending_date):
 
 
 pf = load_portfolio(network, st.session_state["interval"], beginning_date, ending_date)
+
 st.write(
     "Last trades at:",
-    pf.trades.groupby(level=0)
-    .max()
+    pf.trades.loc[
+        pd.DataFrame.from_records(pf.trades.index).groupby(0)[1].last().items()
+    ]
     .loc[
         :,
         [
@@ -122,8 +125,9 @@ st.write(
 
 st.write(
     "Last orders at:",
-    pf.orders.groupby(level=0)
-    .max()
+    pf.orders.loc[
+        pd.DataFrame.from_records(pf.orders.index).groupby(0)[1].last().items()
+    ]
     .loc[
         :,
         ["time", "orderId", "price", "origQty", "executedQty", "status", "side"],
@@ -137,9 +141,9 @@ st.write(
 )
 klines = pf.klines
 returns = pf.returns
-orders = pf.orders.loc[:, beginning_date:ending_date, :]
+orders = pf.orders.loc[:, beginning_date:, :]
 returns.index = returns.index.tz_localize(None)
-
+st.write(pf.initial_amounts)
 ticker = st.selectbox(
     label="Select ticker",
     options=["ALL", "RETURN"] + list(klines.index.get_level_values(0).unique()),
@@ -147,14 +151,26 @@ ticker = st.selectbox(
     index=1,
 )
 
+if st.session_state["ticker"] == "SUM":
+    fig = make_subplots()
+    fig.add_trace(
+        go.Scatter(
+            x=klines.loc[st.session_state["ticker"]].index,
+            y=klines.loc[st.session_state["ticker"]]["value"],
+            name="value",
+        ),
+    )
 
-if st.session_state["ticker"] in list(klines.index.get_level_values(0).unique()):
+elif (
+    st.session_state["ticker"] in list(klines.index.get_level_values(0).unique())
+    and st.session_state["ticker"] != "SUM"
+):
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     sell_mask = orders.loc[st.session_state["ticker"]]["side"] == "SELL"
     sell_orders = orders.loc[st.session_state["ticker"]].loc[sell_mask]
 
     buy_mask = orders.loc[st.session_state["ticker"]]["side"] == "BUY"
-    buy_orders = orders.loc[st.session_state["ticker"]].loc[sell_mask]
+    buy_orders = orders.loc[st.session_state["ticker"]].loc[buy_mask]
     fig.add_trace(
         go.Scatter(
             x=klines.loc[st.session_state["ticker"]].index,
@@ -222,4 +238,4 @@ with open(
     Path(__file__).resolve().parents[1] / "live_trading" / "first_strategy" / "log.txt"
 ) as log_file:
     lines = log_file.readlines()
-    st.write("\n".join(lines[-50:]))
+    st.write("\n".join(lines[-50:-1:]))
