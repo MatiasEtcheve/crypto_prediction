@@ -407,12 +407,9 @@ class PastAsset(LiveAsset):
         self.client = client
 
         self.current_amount = self._get_current_amount_value()
-        self.trades = self.get_all_trades()
+
         self.orders = self.get_all_orders()
-        self.orders = self.orders.set_index(keys="time", drop=False)
-        self.trades = self.trades.set_index(keys="time", drop=False)
-        self.trades = self.trades.sort_index()
-        self.orders = self.orders.sort_index()
+        self.trades = self.get_all_trades()
         self.compute_klines()
 
     def _get_all(self, limit, object_to_call):
@@ -451,10 +448,26 @@ class PastAsset(LiveAsset):
         return trades
 
     def get_all_trades(self, limit=1000):
-        return self._get_all(limit, "trades")
+        trades = self._get_all(limit, "trades")
+        trades = trades.set_index(keys="time", drop=False)
+        trades = trades.sort_index()
+
+        for index, row in trades.iterrows():
+            if row["isBuyer"]:
+                next_sell = trades.loc[~trades["isBuyer"].values].loc[index:]
+                if len(next_sell) > 0:
+                    trades.loc[index, "sold_price"] = next_sell.iloc[0]["price"]
+                    trades.loc[index, "sold_time"] = next_sell.index[0]
+
+                else:
+                    trades.loc[index, "sold_price"] = trades.loc[index, "price"]
+        return trades
 
     def get_all_orders(self, limit=1000):
-        return self._get_all(limit, "orders")
+        orders = self._get_all(limit, "orders")
+        orders = orders.set_index(keys="time", drop=False)
+        orders = orders.sort_index()
+        return orders
 
     def is_file_empty(self, file_name):
         if not file_name.is_file():

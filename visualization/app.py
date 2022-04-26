@@ -122,6 +122,15 @@ st.write(
     ]
     .sort_index(),
 )
+pf.trades["returns"] = (pf.trades["sold_price"] - pf.trades["price"]) / pf.trades[
+    "price"
+]
+st.write(
+    "Best trade:",
+    pf.trades.loc[pf.trades["returns"].idxmax()].loc[
+        :, ["price", "time", "sold_price", "sold_time"]
+    ],
+)
 
 st.write(
     "Last orders at:",
