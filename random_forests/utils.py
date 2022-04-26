@@ -155,7 +155,3 @@ def create_asset(ticker, interval, beginning_date, ending_date, compute_metrics)
         interval=interval,
         compute_metrics=compute_metrics,
     )
-
-
-def dropna(dp):
-
