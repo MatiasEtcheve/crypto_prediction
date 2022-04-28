@@ -122,6 +122,7 @@ class LivePortfolio(object):
                 ending_date=datetime.now(),
                 compute_metrics=utils._concatenate_indicators,
             )
+            print(f"Creating asset: {asset.ticker}")
             assets.append(
                 LiveAsset(
                     asset.ticker,

@@ -124,13 +124,28 @@ class ClassificationPortfolio(portfolios.LivePortfolio):
         return order_ids
 
 
-api_key = os.environ.get("TESTNET_API")
-api_secret = os.environ.get("TESTNET_SECRET")
-client = Client(api_key, api_secret, testnet=True)
+api_key = os.environ.get("BINANCE_API")
+api_secret = os.environ.get("BINANCE_SECRET")
+client = Client(api_key, api_secret, testnet=False)
 pf = ClassificationPortfolio.from_tickers(
     client,
     config,
-    ["BNB", "BTC", "ETH", "LTC", "TRX", "XRP"],
+    [
+        "ALGO",
+        "DOT",
+        "TRX",
+        "EOS",
+        "BNB",
+        "SNX",
+        "OMG",
+        "ETH",
+        "LUNA",
+        "ADA",
+        "AAVE",
+        "SOL",
+        "DOGE",
+        "AVAX",
+    ],
     saving_path / "live_trading",
 )
 
