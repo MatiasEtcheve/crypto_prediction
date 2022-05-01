@@ -442,13 +442,31 @@ class PastAsset(LiveAsset):
                 last_trade_ids += [trade[id] for trade in current_trades]
         trades = pd.DataFrame.from_dict(last_trades)
         trades = trades.apply(pd.to_numeric, errors="ignore")
-        trades["time"] = pd.to_datetime(trades["time"], unit="ms").dt.tz_localize(
-            pytz.UTC
-        )
         return trades
 
     def get_all_trades(self, limit=1000):
         trades = self._get_all(limit, "trades")
+        if trades.empty:
+            trades = pd.DataFrame(
+                columns=[
+                    "symbol",
+                    "id",
+                    "orderId",
+                    "orderListId",
+                    "price",
+                    "qty",
+                    "quoteQty",
+                    "commission",
+                    "commissionAsset",
+                    "time",
+                    "isBuyer",
+                    "isMaker",
+                    "isBestMatch",
+                ]
+            )
+        trades["time"] = pd.to_datetime(trades["time"], unit="ms").dt.tz_localize(
+            pytz.UTC
+        )
         trades = trades.set_index(keys="time", drop=False)
         trades = trades.sort_index()
 
@@ -465,6 +483,32 @@ class PastAsset(LiveAsset):
 
     def get_all_orders(self, limit=1000):
         orders = self._get_all(limit, "orders")
+        if orders.empty:
+            orders = pd.DataFrame(
+                columns=[
+                    "symbol",
+                    "orderId",
+                    "orderListId",
+                    "clientOrderId",
+                    "price",
+                    "origQty",
+                    "executedQty",
+                    "cummulativeQuoteQty",
+                    "status",
+                    "timeInForce",
+                    "type",
+                    "side",
+                    "stopPrice",
+                    "icebergQty",
+                    "time",
+                    "updateTime",
+                    "isWorking",
+                    "origQuoteOrderQty",
+                ]
+            )
+        orders["time"] = pd.to_datetime(orders["time"], unit="ms").dt.tz_localize(
+            pytz.UTC
+        )
         orders = orders.set_index(keys="time", drop=False)
         orders = orders.sort_index()
         return orders
@@ -479,9 +523,6 @@ class PastAsset(LiveAsset):
         return False
 
     def compute_klines(self):
-        if len(self.trades) == 0:
-            return []
-
         self.trades["amountAdded"] = self.trades["qty"] * (
             2 * self.trades["isBuyer"] - 1
         )
@@ -493,6 +534,7 @@ class PastAsset(LiveAsset):
         self.df["amountAdded"] = 0
 
         self.klines = pd.concat((self.df, trades))
+
         self.klines = self.klines.sort_index()
 
         self.initial_amount = (
@@ -506,6 +548,7 @@ class PastAsset(LiveAsset):
         # self.klines = self.klines[np.isnan(self.klines["trades"])].drop(
         #     labels=["trades", "price"], axis=1
         # )
+        print(self.ticker, self.klines)
         self.df = self.df.drop(labels=["price", "amountAdded"], axis=1)
 
 
@@ -534,9 +577,6 @@ class PastQuote(PastAsset):
         raise NotImplementedError()
 
     def compute_klines(self):
-        if len(self.trades) == 0:
-            return []
-
         self.trades["amountAdded"] = -self.trades["quoteQty"] * (
             2 * self.trades["isBuyer"] - 1
         )

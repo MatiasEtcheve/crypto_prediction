@@ -94,27 +94,13 @@ class LivePortfolio(object):
         return amount
 
     def _compute_current_balance(self):
-        amount = {}
-        value = {}
-        for balance in self.client.get_account()["balances"]:
-            if balance["asset"] in ["BUSD", "USDT"]:
-                value[balance["asset"]] = float(balance["free"]) + float(
-                    balance["locked"]
-                )
-            else:
-                avg_price = float(
-                    self.client.get_avg_price(symbol=balance["asset"] + "USDT")["price"]
-                )
-                value[balance["asset"]] = (
-                    float(balance["free"]) + float(balance["locked"])
-                ) * avg_price
-            amount[balance["asset"]] = float(balance["free"]) + float(balance["locked"])
-        return amount, value
+        return _compute_current_balance(self.client)
 
     @classmethod
     def from_tickers(cls, client, config, tickers, path):
         assets = []
         for ticker in tickers:
+            print(f"Building {ticker} asset:")
             asset = utils.create_asset(
                 ticker,
                 config["interval"],
@@ -122,7 +108,6 @@ class LivePortfolio(object):
                 ending_date=datetime.now(),
                 compute_metrics=utils._concatenate_indicators,
             )
-            print(f"Creating asset: {asset.ticker}")
             assets.append(
                 LiveAsset(
                     asset.ticker,
@@ -156,11 +141,15 @@ class PastPortfolio(LivePortfolio):
             axis=0,
         )
 
+        earliest_date = min(
+            [asset.klines.index.min() for asset in self.assets.values()]
+        )
+        latest_date = max([asset.klines.index.max() for asset in self.assets.values()])
         quote = utils.create_asset(
             "BUSD",
             self.config["interval"],
-            self.trades.index.get_level_values(1).min(),
-            self.trades.index.get_level_values(1).max(),
+            earliest_date,
+            latest_date,
             utils._concatenate_indicators,
         )
         self.quote = PastQuote(
@@ -174,10 +163,7 @@ class PastPortfolio(LivePortfolio):
         )
 
         self._compute_klines()
-        (
-            self.current_amounts,
-            self.current_values,
-        ) = self._compute_current_balance()
+        self.current_values = self._compute_current_balance()
         self.initial_amounts = self._compute_inital_balance()
 
     def _compute_klines(self):
@@ -191,7 +177,6 @@ class PastPortfolio(LivePortfolio):
             keys=self.tickers + ["BUSD"],
             axis=0,
         )
-
         somme = klines.groupby(level=1).agg(
             amount=("amount", "sum"), value=("value", "sum")
         )
@@ -209,12 +194,14 @@ class PastPortfolio(LivePortfolio):
                 ),
             ]
         )
+        print(self.klines.loc["SUM"]["value"])
         self.returns = self.klines.loc["SUM"]["value"].pct_change()
 
     @classmethod
     def from_tickers(cls, client, config, asset_tickers, beginning_date, ending_date):
         assets = []
         for ticker in asset_tickers:
+            print(f"Building {ticker} asset:")
             asset = utils.create_asset(
                 ticker,
                 config["interval"],
@@ -233,3 +220,35 @@ class PastPortfolio(LivePortfolio):
                 )
             )
         return cls(client, config, assets=assets)
+
+
+def _compute_current_balance(client):
+    balances = []
+    for balance in client.get_account()["balances"]:
+        ticker = balance["asset"]
+        if balance["asset"].startswith("LD"):
+            ticker = balance["asset"][2:]
+
+        current_amount = float(balance["free"]) + float(balance["locked"])
+        if current_amount > 0:
+
+            if ticker in ["BUSD", "USDT"]:
+                avg_price = 1
+            elif ticker == "BTC":
+                avg_price = float(client.get_avg_price(symbol=ticker + "USDT")["price"])
+
+            else:
+                avg_price = float(
+                    client.get_avg_price(symbol=ticker + "BTC")["price"]
+                ) * float(client.get_avg_price(symbol="BTCUSDT")["price"])
+            current_value = current_amount * avg_price
+        else:
+            current_value = 0
+        balances.append(
+            {"ticker": ticker, "amount": current_amount, "value": current_value}
+        )
+    return (
+        pd.DataFrame(balances)
+        .set_index(keys="ticker", drop=True)
+        .sort_values("value", axis=0, ascending=False)
+    )

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import get_data
 import numpy as np
 import pandas as pd
@@ -29,27 +31,6 @@ class DataModule:
             self.inputs = inputs
         else:
             raise NotImplementedError("")
-
-    def _get_data(
-        self,
-        ticker=None,
-        beginning_date=None,
-        ending_date=None,
-        interval="12h",
-    ):
-        try:
-            data = get_data.download_klines(
-                ticker,
-                interval,
-                beginning_date=beginning_date,
-                ending_date=ending_date,
-                compute_metrics=self.compute_metrics,
-            )
-            return data
-        except Exception as e:
-            print(f"Ticker {ticker} could not be downloaded")
-            print(f"\t{e}")
-            return []
 
     def _init_train_val_data(self, train_datapoints):
         test_ratio = self.config["train_val_test_split"][-1]
@@ -85,6 +66,7 @@ class DataModule:
                 **input,
                 interval=self.config["interval"],
                 compute_metrics=self.compute_metrics,
+                save_klines=True,
             )
             if dp == []:
                 continue
@@ -127,21 +109,26 @@ def _concatenate_indicators(data):
     return data
 
 
-def create_asset(ticker, interval, beginning_date, ending_date, compute_metrics):
-    # try:
-    data = get_data.download_klines(
-        ticker,
-        interval,
-        beginning_date=beginning_date,
-        ending_date=ending_date,
-        compute_metrics=compute_metrics,
-    )
-    # except Exception as e:
-    #     print(f"Ticker {ticker} could not be downloaded")
-    #     print(f"\t{e}")
-    #     return []
-    # else:
-    # data = data.dropna(axis=0)
+def create_asset(
+    ticker, interval, beginning_date, ending_date, compute_metrics, save_klines=False
+):
+    if save_klines:
+        data = get_data.select_data(
+            ticker,
+            interval,
+            beginning_date=beginning_date,
+            ending_date=ending_date,
+            compute_metrics=compute_metrics,
+            directory=Path(__file__).resolve().parent / "tmp" / "klines",
+        )
+    else:
+        data = get_data.download_klines(
+            ticker,
+            interval,
+            beginning_date=beginning_date,
+            ending_date=ending_date,
+            compute_metrics=compute_metrics,
+        )
     data = data.replace(
         to_replace=[np.inf, -np.inf, np.float32("inf"), -np.float32("inf")],
         value=0,

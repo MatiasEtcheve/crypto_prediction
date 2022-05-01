@@ -3,6 +3,7 @@ import logging
 import os
 import pickle
 import time
+from calendar import c
 from datetime import datetime, timedelta
 from distutils.log import ERROR
 from importlib import reload
@@ -26,7 +27,7 @@ starting_date = datetime.now()
 
 wandb_api.login()
 api = wandb.Api()
-run_name = "1fullt5y"
+run_name = "1gqaeid3"
 run = api.run(f"matiasetcheverry/crypto-prediction/{run_name}")
 config = run.config
 model = run.file("rf.pkl")
@@ -57,47 +58,78 @@ logger.setLevel(logging.DEBUG)
 
 
 class ClassificationPortfolio(portfolios.LivePortfolio):
-    def compute_amount_money(
-        self, money: float, directions: np.ndarray, probabilities: np.ndarray
+    def _compute_nb_asset_with_allocated_money_below_threshold(
+        self, allocated_money, threshold
     ):
-        # preallocated_money = [
-        #     float(self.client.get_asset_balance(asset=asset.ticker)["free"])
-        #     - asset.initial_amount
-        #     for asset in self.assets.values()
-        # ]
-        allocated_money = np.zeros_like(probabilities)
-        # mask = directions * (np.array(preallocated_money) == 0)
-        mask = directions
-        allocated_money[mask] = (
-            probabilities[mask] * money / np.sum(probabilities[mask])
-        )
+        return np.sum([1 for m in allocated_money.values() if m < threshold])
+
+    def _get_top_n_assets(self, probabilities, n):
+        if n >= len(list(probabilities.keys())):
+            n = len(list(probabilities.keys()))
+        sorted_probabilities = {
+            ticker: p
+            for ticker, p in sorted(
+                probabilities.items(), key=lambda item: item[1], reverse=True
+            )
+        }
+        return {
+            ticker: sorted_probabilities[ticker]
+            for ticker in list(sorted_probabilities.keys())[:n]
+        }
+
+    def _allocate_money(self, probabilities, money):
+        sum_probabilities = np.sum(list(probabilities.values()))
+        allocated_money = {
+            ticker: probabilities[ticker] * money / sum_probabilities
+            for ticker in probabilities.keys()
+        }
+        return allocated_money
+
+    def compute_amount_money(self, money: float, probabilities: np.ndarray):
+        allocated_money = {ticker: 0 for ticker in probabilities.keys()}
+        positive_probabilities = {k: p for k, p in probabilities.items() if p > 0.5}
+        n = len(list(probabilities.keys()))
+
+        current_probabilities = self._get_top_n_assets(positive_probabilities, n)
+        current_allocated_money = self._allocate_money(current_probabilities, money)
+        while (
+            self._compute_nb_asset_with_allocated_money_below_threshold(
+                current_allocated_money, 10
+            )
+            > 0
+            and n > 1
+        ):
+            n -= 1
+            current_probabilities = self._get_top_n_assets(positive_probabilities, n)
+            current_allocated_money = self._allocate_money(current_probabilities, money)
+
+        allocated_money.update(current_allocated_money)
         return allocated_money
 
     def compute_probabilities(self) -> np.ndarray:
-        probabilities = []
+        probabilities = {}
         for asset in self.assets.values():
             try:
-                probabilities.append(asset.predict_proba_last_from(rf))
+                p = asset.predict_proba_last_from(rf)
             except ValueError as e:
                 logger.error(f"Problem predicting on {asset.ticker}: {e}")
-                probabilities.append(0)
-        return np.array(probabilities)
+                p = 0
+            probabilities[asset.ticker] = p
+        return probabilities
 
     def trade(self, money: int):
         # os.system("/bin/bash -c 'ntpdate pool.ntp.org'")
         self.cancel_orders()
         probabilities = self.compute_probabilities()
-        directions = probabilities > 0.5
         allocated_money = self.compute_amount_money(
             money,
-            directions,
             probabilities,
         )
         order_ids = []
-        for index, asset in enumerate(self.assets.values()):
-            probability = probabilities[index]
-            direction = directions[index]
-            money = allocated_money[index]
+        for asset in self.assets.values():
+            probability = probabilities[asset.ticker]
+            direction = probability > 0.5
+            money = allocated_money[asset.ticker]
             logger.info(
                 f"prediction: ticker: {asset.ticker}, probability: {probability}, side: {direction}, money: {money}"
             )
@@ -105,10 +137,10 @@ class ClassificationPortfolio(portfolios.LivePortfolio):
                 f"prediction: ticker: {asset.ticker}, probability: {probability}, side: {direction}, money: {money}"
             )
 
-        for index, asset in enumerate(self.assets.values()):
-            probability = probabilities[index]
-            direction = directions[index]
-            money = allocated_money[index]
+        for asset in self.assets.values():
+            probability = probabilities[asset.ticker]
+            direction = probability > 0.5
+            money = allocated_money[asset.ticker]
             orders = asset.swap_single_ticker(direction, money)
             if orders is not None:
                 for order in orders:

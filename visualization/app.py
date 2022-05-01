@@ -30,7 +30,7 @@ reload_cache = st.button(label="Reload cache", on_click=st.experimental_memo.cle
 network = st.radio(
     label="Select network",
     options=["Binance", "Testnet"],
-    index=1,
+    index=0,
 )
 
 col1, col2 = st.columns(2)
@@ -83,7 +83,7 @@ if st.session_state["period"] == "All":
 
 
 @st.experimental_memo
-def load_portfolio(network, interval, beginning_date, ending_date):
+def load_portfolio(network, interval):
     if network == "Testnet":
         api_key = os.environ.get("TESTNET_API")
         api_secret = os.environ.get("TESTNET_SECRET")
@@ -122,7 +122,7 @@ def load_portfolio(network, interval, beginning_date, ending_date):
     )
 
 
-pf = load_portfolio(network, st.session_state["interval"], beginning_date, ending_date)
+pf = load_portfolio(network, st.session_state["interval"])
 
 st.write(
     "Last trades at:",
@@ -146,12 +146,12 @@ st.write(
 pf.trades["returns"] = (pf.trades["sold_price"] - pf.trades["price"]) / pf.trades[
     "price"
 ]
-st.write(
-    "Best trade:",
-    pf.trades.loc[pf.trades["returns"].idxmax()].loc[
-        :, ["price", "time", "sold_price", "sold_time"]
-    ],
-)
+# st.write(
+#     "Best trade:",
+#     pf.trades.loc[pf.trades["returns"].idxmax()].loc[
+#         :, ["price", "time", "sold_price", "sold_time"]
+#     ],
+# )
 
 st.write(
     "Last orders at:",
@@ -167,13 +167,13 @@ st.write(
 
 st.write(
     "Balances",
-    pd.DataFrame.from_dict(pf.current_amounts, orient="index", columns=["amount"]),
+    pf.current_values,
 )
 klines = pf.klines
 returns = pf.returns
 orders = pf.orders.loc[:, beginning_date:, :]
 returns.index = returns.index.tz_localize(None)
-st.write(pf.initial_amounts)
+
 ticker = st.selectbox(
     label="Select ticker",
     options=["ALL", "RETURN"] + list(klines.index.get_level_values(0).unique()),
@@ -196,11 +196,38 @@ elif (
     and st.session_state["ticker"] != "SUM"
 ):
     fig = make_subplots(specs=[[{"secondary_y": True}]])
-    sell_mask = orders.loc[st.session_state["ticker"]]["side"] == "SELL"
-    sell_orders = orders.loc[st.session_state["ticker"]].loc[sell_mask]
+    if st.session_state["ticker"] in orders.index.get_level_values(0):
+        sell_mask = orders.loc[st.session_state["ticker"]]["side"] == "SELL"
+        sell_orders = orders.loc[st.session_state["ticker"]].loc[sell_mask]
 
-    buy_mask = orders.loc[st.session_state["ticker"]]["side"] == "BUY"
-    buy_orders = orders.loc[st.session_state["ticker"]].loc[buy_mask]
+        buy_mask = orders.loc[st.session_state["ticker"]]["side"] == "BUY"
+        buy_orders = orders.loc[st.session_state["ticker"]].loc[buy_mask]
+
+        size = 12
+        fig.add_trace(
+            go.Scatter(
+                x=sell_orders["time"],
+                y=sell_orders["price"],
+                name="sell orders",
+                mode="markers",
+                marker=dict(
+                    symbol="triangle-down",
+                    size=size,
+                ),
+            ),
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=buy_orders["time"],
+                y=buy_orders["price"],
+                name="buy orders",
+                mode="markers",
+                marker=dict(
+                    symbol="triangle-up",
+                    size=size,
+                ),
+            ),
+        )
     fig.add_trace(
         go.Scatter(
             x=klines.loc[st.session_state["ticker"]].index,
@@ -217,31 +244,7 @@ elif (
         ),
         secondary_y=False,
     )
-    size = 12
-    fig.add_trace(
-        go.Scatter(
-            x=sell_orders["time"],
-            y=sell_orders["price"],
-            name="sell orders",
-            mode="markers",
-            marker=dict(
-                symbol="triangle-down",
-                size=size,
-            ),
-        ),
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=buy_orders["time"],
-            y=buy_orders["price"],
-            name="buy orders",
-            mode="markers",
-            marker=dict(
-                symbol="triangle-up",
-                size=size,
-            ),
-        ),
-    )
+
 elif st.session_state["ticker"] == "RETURN":
     fig = px.line(returns)
 elif st.session_state["ticker"] == "SUM":

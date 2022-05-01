@@ -125,11 +125,10 @@ def save_klines(
     interval,
     beginning_date,
     ending_date,
-    directory=str(Path(__file__).resolve().parent),
+    directory=Path(__file__).resolve().parent,
     type="csv",
 ):
-
-    filename = str(directory) + "_".join(
+    filename = Path(directory) / "_".join(
         [
             "-".join(symbol) if isinstance(symbol, list) else symbol,
             interval,
@@ -139,10 +138,10 @@ def save_klines(
     )
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
     if type == "vbt":
-        filename += ".pkl"
+        filename = str(filename) + ".pkl"
         klines.save(fname=filename)
     elif type == "csv":
-        filename += ".csv"
+        filename = str(filename) + ".csv"
         klines.to_csv(filename)
     return filename
 
@@ -212,9 +211,9 @@ def select_data(
         pd.DataFrame: dataframe containing klines
     """
     if type == "csv":
-        p = Path(directory).glob("**/*.csv")
+        p = Path(directory).glob("*.csv")
     else:
-        p = Path(directory).glob("**/*.pkl")
+        p = Path(directory).glob("*.pkl")
     files = [x for x in p if x.is_file()]
     filenames = [x.stem.split("_") for x in files]
     df_files = pd.DataFrame(
