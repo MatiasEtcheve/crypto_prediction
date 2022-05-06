@@ -28,10 +28,8 @@ def select_klines_from_file(beginning_date, ending_date, filename, type="csv"):
         klines = pd.read_csv(filename)
         klines = klines.rename(columns={klines.columns[0]: "Datetime"})
         klines["Datetime"] = pd.to_datetime(klines["Datetime"], utc=True)
-        mask = (klines["Datetime"] >= beginning_date) & (
-            klines["Datetime"] <= ending_date
-        )
-        return klines.loc[mask]
+        klines = klines.set_index("Datetime", drop=True)
+        return klines.loc[beginning_date:ending_date]
     elif type == "vbt":
         # klines = vbt.Data.load(filename)
         return klines.loc[beginning_date:ending_date]
@@ -196,6 +194,7 @@ def select_data(
     directory=Path(__file__).resolve().parent,
     type="csv",
 ):
+
     """
     Selects klines of `symbol` from `from_date` to `to_date`, at interval `interval`.
     If the klines have already been downloaded, it fetches it in the csv file.
@@ -249,24 +248,34 @@ def select_data(
         & (df_files["start_date"] >= beginning_date)
         & (df_files["end_date"] <= ending_date)
     ]
-
     if not perfect_file.empty:
         filename = files[perfect_file.index[0]]
         return select_klines_from_file(beginning_date, ending_date, filename, type)
-    elif not sooner_file.empty or not later_file.empty:
+
+    new_beginning_date = beginning_date
+    new_ending_date = ending_date
+    if not sooner_file.empty or not later_file.empty:
         if not sooner_file.empty:
-            beginning_date = min(beginning_date, sooner_file["start_date"].iloc[0])
+            new_beginning_date = min(
+                new_beginning_date, sooner_file["start_date"].iloc[0]
+            )
             filename = files[sooner_file.index[0]]
             Path.unlink(filename)
         if not later_file.empty:
-            ending_date = max(ending_date, later_file["end_date"].iloc[0])
+            new_ending_date = max(new_ending_date, later_file["end_date"].iloc[0])
             filename = files[later_file.index[0]]
             Path.unlink(filename)
     for index in useless_file.index:
         filename = files[index]
         Path.unlink(filename)
     new_filename = download_and_save_klines(
-        symbol, interval, beginning_date, ending_date, compute_metrics, directory, type
+        symbol,
+        interval,
+        new_beginning_date,
+        new_ending_date,
+        compute_metrics,
+        directory,
+        type,
     )
     return select_klines_from_file(beginning_date, ending_date, new_filename, type)
 

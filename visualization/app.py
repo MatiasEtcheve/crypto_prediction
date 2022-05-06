@@ -20,6 +20,7 @@ from binance.client import Client
 from datasets import assets, portfolios
 from datasets.portfolios import PastPortfolio
 from plotly.subplots import make_subplots
+from yfinance import Tickers
 
 qs.extend_pandas()
 testnet = True
@@ -87,15 +88,11 @@ def load_portfolio(network, interval):
     if network == "Testnet":
         api_key = os.environ.get("TESTNET_API")
         api_secret = os.environ.get("TESTNET_SECRET")
+        tickers = ["BNB", "BTC", "ETH", "LTC", "TRX", "XRP"]
     elif network == "Binance":
         api_key = os.environ.get("BINANCE_WATCH_API")
         api_secret = os.environ.get("BINANCE_WATCH_SECRET")
-    client = Client(api_key, api_secret, testnet=network == "Testnet")
-    config = {"interval": interval}
-    return PastPortfolio.from_tickers(
-        client,
-        config,
-        [
+        tickers = [
             "ETH",
             "BTC",
             "BNB",
@@ -116,36 +113,46 @@ def load_portfolio(network, interval):
             "SOL",
             "DOGE",
             "AVAX",
-        ],
+        ]
+    else:
+        raise NotImplementedError("")
+    client = Client(api_key, api_secret, testnet=network == "Testnet")
+    config = {"interval": interval}
+    return PastPortfolio.from_tickers(
+        client,
+        config,
+        tickers,
         beginning_date,
         ending_date,
     )
 
 
 pf = load_portfolio(network, st.session_state["interval"])
-
-st.write(
-    "Last trades at:",
-    pf.trades.loc[
-        pd.DataFrame.from_records(pf.trades.index).groupby(0)[1].last().items()
-    ]
-    .loc[
-        :,
-        [
-            "time",
-            "orderId",
-            "price",
-            "qty",
-            "commission",
-            "isBuyer",
-            "amountAdded",
-        ],
-    ]
-    .sort_index(),
-)
 pf.trades["returns"] = (pf.trades["sold_price"] - pf.trades["price"]) / pf.trades[
     "price"
 ]
+
+if not pf.trades.empty:
+    st.write(
+        "Last trades at:",
+        pf.trades.loc[
+            pd.DataFrame.from_records(pf.trades.index).groupby(0)[1].last().items()
+        ]
+        .loc[
+            :,
+            [
+                "time",
+                "orderId",
+                "price",
+                "qty",
+                "commission",
+                "isBuyer",
+                "amountAdded",
+            ],
+        ]
+        .sort_index(),
+    )
+
 # st.write(
 #     "Best trade:",
 #     pf.trades.loc[pf.trades["returns"].idxmax()].loc[
@@ -153,22 +160,24 @@ pf.trades["returns"] = (pf.trades["sold_price"] - pf.trades["price"]) / pf.trade
 #     ],
 # )
 
-st.write(
-    "Last orders at:",
-    pf.orders.loc[
-        pd.DataFrame.from_records(pf.orders.index).groupby(0)[1].last().items()
-    ]
-    .loc[
-        :,
-        ["time", "orderId", "price", "origQty", "executedQty", "status", "side"],
-    ]
-    .sort_index(),
-)
+if not pf.orders.empty:
+    st.write(
+        "Last orders at:",
+        pf.orders.loc[
+            pd.DataFrame.from_records(pf.orders.index).groupby(0)[1].last().items()
+        ]
+        .loc[
+            :,
+            ["time", "orderId", "price", "origQty", "executedQty", "status", "side"],
+        ]
+        .sort_index(),
+    )
 
 st.write(
     "Balances",
     pf.current_values,
 )
+st.write("Initial balance", pf.initial_amounts)
 klines = pf.klines
 returns = pf.returns
 orders = pf.orders.loc[:, beginning_date:, :]

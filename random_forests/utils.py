@@ -14,7 +14,6 @@ class DataModule:
         csv_file=None,
         inputs=None,
     ):
-        super().__init__()
         self.config = config
         self.compute_metrics = compute_metrics
 
@@ -46,8 +45,8 @@ class DataModule:
                     / (1 - test_ratio)
                     * len(features)
                 )
-                if test_ratio != 1
-                else 0
+                if test_ratio != 0
+                else self.config["train_val_test_split"][0]
             )
             train_dataset = (features[:train_size], labels[:train_size])
             val_dataset = (features[train_size:], labels[train_size:])
@@ -58,7 +57,6 @@ class DataModule:
 
     def setup(self):
         train_val_ratio = 1 - self.config["train_val_test_split"][-1]
-
         self.test_datapoints = []
         train_datapoints = []
         for input in self.inputs:
@@ -97,7 +95,7 @@ class DataModule:
         )
 
 
-def _concatenate_indicators(data):
+def _concatenate_indicators(data, percentage=0.1):
     m = list(range(1, 21)) + list(range(40, 241, 20))
     for mi in [0] + m:
         data[f"ir_{mi}"] = data["Close"].shift(mi) / data["Open"].shift(mi) - 1
@@ -105,6 +103,12 @@ def _concatenate_indicators(data):
         data[f"cr_{mi}"] = data["Close"].shift(1) / data["Close"].shift(mi + 1) - 1
     for mi in m:
         data[f"or_{mi}"] = data["Open"] / data["Close"].shift(mi) - 1
+    # positive_mask = data["Close"] > data["Open"] * (1 + percentage)
+    # following_day_mask = positive_mask.shift(1, fill_value=False)
+    # data["Direction"] = False
+    # data["Direction"].loc[following_day_mask] = (
+    #     data[following_day_mask]["Close"] > data[following_day_mask]["Open"]
+    # )
     data["Direction"] = data["Close"] > data["Open"]
     return data
 

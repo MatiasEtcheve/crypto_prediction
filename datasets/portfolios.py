@@ -1,19 +1,14 @@
-import sys
+import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from pprint import pprint
-from typing import Callable, List, Optional, Union
+from typing import List, Optional
 
 import get_data
-import numpy as np
 import pandas as pd
 import pytz
-from binance import BinanceSocketManager
 from binance.client import Client
-from binance.enums import *
 from random_forests import utils
 
-import datasets.filters
 from datasets.assets import LiveAsset, PastAsset, PastQuote
 
 
@@ -88,10 +83,14 @@ class LivePortfolio(object):
         all_balances_df.to_csv(path, index=False)
 
     def _compute_inital_balance(self):
-        amount = {}
+        amount = []
         for asset in self.assets.values():
-            amount[asset.ticker] = asset.initial_amount
-        return amount
+            amount.append({"ticker": asset.ticker, "amount": asset.initial_amount})
+        return (
+            pd.DataFrame(amount)
+            .set_index(keys="ticker", drop=True)
+            .sort_values("amount", axis=0, ascending=False)
+        )
 
     def _compute_current_balance(self):
         return _compute_current_balance(self.client)
@@ -99,12 +98,19 @@ class LivePortfolio(object):
     @classmethod
     def from_tickers(cls, client, config, tickers, path):
         assets = []
+
+        time_equivalence = {"d": "days", "h": "hours", "m": "minutes"}
+        interval_value, interval_base = re.findall("\d+|\D+", config["interval"])
+        interval_value = 400 * int(interval_value)
+        interval_base = time_equivalence[interval_base]
+
         for ticker in tickers:
             print(f"Building {ticker} asset:")
             asset = utils.create_asset(
                 ticker,
                 config["interval"],
-                beginning_date=datetime.now() - timedelta(days=400),
+                beginning_date=datetime.now()
+                - timedelta(**{interval_base: interval_value}),
                 ending_date=datetime.now(),
                 compute_metrics=utils._concatenate_indicators,
             )

@@ -12,6 +12,7 @@ import pytz
 from binance import BinanceSocketManager
 from binance.client import Client
 from binance.enums import *
+from sklearn.preprocessing import MinMaxScaler
 
 from datasets.filters import *
 
@@ -30,9 +31,6 @@ def get_logger(name):
     return logger
 
 
-logger = get_logger(__name__)
-
-
 class TrainAsset(object):
     def __init__(
         self,
@@ -48,6 +46,11 @@ class TrainAsset(object):
         self.interval = interval
         self.compute_metrics = compute_metrics
 
+        self.scaler = MinMaxScaler()
+
+        if not self.isempty:
+            self.scaler.fit(self.df.to_numpy()[:, 6:])
+
         assert len(self.labels) == len(self.df)
 
     @property
@@ -56,7 +59,7 @@ class TrainAsset(object):
 
     @property
     def features(self):
-        return self.df.to_numpy()[:, 6:]
+        return self.scaler.transform(self.df.to_numpy()[:, 6:])
 
     def predict_from(self, rf):
         return rf.predict(self.features)
@@ -117,7 +120,9 @@ class LiveAsset(TrainAsset):
         self._trade_ids = set()
         self._order_ids = set()
 
-    def _get_current_amount_value(self):
+        self.logger = get_logger(str(__name__) + f".{self.ticker}")
+
+    def _get_current_amount(self):
         balance = self.client.get_asset_balance(asset=self.ticker)
         return float(balance["free"]) + float(balance["locked"])
 
@@ -247,11 +252,11 @@ class LiveAsset(TrainAsset):
                         )
                     )
             except MinNotionalException as e:
-                logger.error(
+                self.logger.error(
                     f"Can't sell {self.ticker} dust:\n\tAmount: {e.amount}\tPrice: {e.price}\n\tMin notional: {e.min_notional}\tNotional: {e.notional}"
                 )
             except Exception as e:
-                logger.error(f"{type(e)}: {str(e)}")
+                self.logger.error(f"{type(e)}: {str(e)}")
             else:
                 return orders
         return None
@@ -266,13 +271,13 @@ class LiveAsset(TrainAsset):
                 )
             ]
         except MinNotionalException as e:
-            logger.error(
+            self.logger.error(
                 f"Can't buy {self.ticker} dust:\n\tAmount: {e.amount}\tPrice: {e.price}\n\tMin notional: {e.min_notional}\tNotional: {e.notional}"
             )
         except LowSizeException as e:
-            logger.error(f"Can't buy {self.ticker} dust:\nLow size error")
+            self.logger.error(f"Can't buy {self.ticker} dust:\nLow size error")
         except Exception as e:
-            logger.error(f"{type(e)}: {str(e)}")
+            self.logger.error(f"{type(e)}: {str(e)}")
         else:
             return orders
         return None
@@ -406,7 +411,7 @@ class PastAsset(LiveAsset):
         super(LiveAsset, self).__init__(ticker, df, labels, interval, compute_metrics)
         self.client = client
 
-        self.current_amount = self._get_current_amount_value()
+        self.current_amount = self._get_current_amount()
 
         self.orders = self.get_all_orders()
         self.trades = self.get_all_trades()
@@ -470,6 +475,7 @@ class PastAsset(LiveAsset):
         trades = trades.set_index(keys="time", drop=False)
         trades = trades.sort_index()
 
+        trades["sold_price"] = np.nan
         for index, row in trades.iterrows():
             if row["isBuyer"]:
                 next_sell = trades.loc[~trades["isBuyer"].values].loc[index:]
@@ -566,7 +572,7 @@ class PastQuote(PastAsset):
         super(LiveAsset, self).__init__(ticker, df, labels, interval, compute_metrics)
         self.client = client
 
-        self.current_amount = self._get_current_amount_value()
+        self.current_amount = self._get_current_amount()
         self.trades = trades
         self.compute_klines()
 
