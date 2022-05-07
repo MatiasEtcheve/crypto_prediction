@@ -152,11 +152,11 @@ class VolatilityPortfolio(portfolios.LivePortfolio):
                 asset.cancel_orders()
                 self.place_orders(asset)
 
-            sell_order = self.client.get_order(
-                symbol=self.sell_orders[asset.ticker]["symbol"],
-                orderId=self.sell_orders[asset.ticker]["orderId"],
-            )
-            if sell_order["status"] in [
+            sell_order = self.sell_orders[asset.ticker]
+            if sell_order is not None and self.client.get_order(
+                symbol=sell_order["symbol"],
+                orderId=sell_order["orderId"],
+            )["status"] in [
                 ORDER_STATUS_PARTIALLY_FILLED,
                 ORDER_STATUS_FILLED,
             ]:
