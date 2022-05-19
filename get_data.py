@@ -1,18 +1,23 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Callable
 
 import pandas as pd
 import pytz
 import yfinance as yf
-
-# import vectorbt as vbt
 
 # FORMAT = "%Y-%m-%d"
 FORMAT = "%d-%m-%Y"
 """Expected datetime format"""
 
 
-def select_klines_from_file(beginning_date, ending_date, filename, type="csv"):
+def select_klines_from_file(
+    beginning_date: datetime,
+    ending_date: datetime,
+    filename: Path,
+    compute_metrics: Callable = lambda x: x,
+    type: str = "csv",
+):
     """
     Selects klines from a csv file. These klines open at `beginning_date` and close at `ending_date`.
 
@@ -27,16 +32,18 @@ def select_klines_from_file(beginning_date, ending_date, filename, type="csv"):
     if type == "csv":
         klines = pd.read_csv(filename)
         klines = klines.rename(columns={klines.columns[0]: "Datetime"})
-        klines["Datetime"] = pd.to_datetime(klines["Datetime"], utc=True)
+        klines.loc[:, "Datetime"] = pd.to_datetime(klines["Datetime"], utc=True)
         klines = klines.set_index("Datetime", drop=True)
-        return klines.loc[beginning_date:ending_date]
-    elif type == "vbt":
-        # klines = vbt.Data.load(filename)
-        return klines.loc[beginning_date:ending_date]
+        klines = klines.loc[beginning_date:ending_date]
+        return compute_metrics(klines)
 
 
-def download_klines(
-    symbol, interval, beginning_date, ending_date, compute_metrics=None, type="csv"
+def _download_klines(
+    symbol: str,
+    interval: str,
+    beginning_date: datetime,
+    ending_date: datetime,
+    type: str = "csv",
 ):
     if type == "vbt":
         pass
@@ -107,24 +114,22 @@ def download_klines(
                 axis=1,
             )
 
-            klines["Datetime"] = pd.to_datetime(
+            klines.loc[:, "Datetime"] = pd.to_datetime(
                 klines["Datetime"], unit="ms"
             ).dt.tz_localize(pytz.UTC)
             klines = klines.set_index("Datetime")
             klines = klines.astype("float32")
-        if compute_metrics is not None:
-            klines = compute_metrics(klines)
     return klines
 
 
 def save_klines(
-    klines,
-    symbol,
-    interval,
-    beginning_date,
-    ending_date,
-    directory=Path(__file__).resolve().parent,
-    type="csv",
+    klines: pd.DataFrame,
+    symbol: str,
+    interval: str,
+    beginning_date: datetime,
+    ending_date: datetime,
+    directory: Path = Path(__file__).resolve().parent,
+    type: str = "csv",
 ):
     filename = Path(directory) / "_".join(
         [
@@ -145,13 +150,12 @@ def save_klines(
 
 
 def download_and_save_klines(
-    symbol,
-    interval,
-    beginning_date,
-    ending_date,
-    compute_metrics=None,
-    directory=str(Path(__file__).resolve().parent),
-    type="csv",
+    symbol: str,
+    interval: str,
+    beginning_date: datetime,
+    ending_date: datetime,
+    directory: Path = str(Path(__file__).resolve().parent),
+    type: str = "csv",
 ):
     """
     Downloads klines of `symbol` from `from_date` to `to_date`, at interval `interval`.
@@ -165,12 +169,11 @@ def download_and_save_klines(
     Returns:
         str: filename of csv file containing the klines
     """
-    klines = download_klines(
+    klines = _download_klines(
         symbol,
         interval,
         beginning_date,
         ending_date,
-        compute_metrics,
         type,
     )
     filename = save_klines(
@@ -185,14 +188,26 @@ def download_and_save_klines(
     return filename
 
 
+def download_data(
+    symbol: str,
+    interval: str,
+    beginning_date: datetime,
+    ending_date: datetime,
+    compute_metrics: Callable = lambda x: x,
+    type: str = "csv",
+):
+    klines = _download_klines(symbol, interval, beginning_date, ending_date, type=type)
+    return compute_metrics(klines)
+
+
 def select_data(
-    symbol,
-    interval,
-    beginning_date,
-    ending_date,
-    compute_metrics=None,
-    directory=Path(__file__).resolve().parent,
-    type="csv",
+    symbol: str,
+    interval: str,
+    beginning_date: datetime,
+    ending_date: datetime,
+    compute_metrics: Callable = lambda x: x,
+    directory: Path = Path(__file__).resolve().parent,
+    type: str = "csv",
 ):
 
     """
@@ -218,9 +233,9 @@ def select_data(
     df_files = pd.DataFrame(
         filenames, columns=["symbol", "interval", "start_date", "end_date"]
     )
-    df_files[["start_date", "end_date"]] = df_files[["start_date", "end_date"]].apply(
-        lambda x: pd.to_datetime(x, format=FORMAT).dt.tz_localize("UTC")
-    )
+    df_files.loc[:, ["start_date", "end_date"]] = df_files[
+        ["start_date", "end_date"]
+    ].apply(lambda x: pd.to_datetime(x, format=FORMAT).dt.tz_localize("UTC"))
 
     beginning_date = beginning_date.replace(tzinfo=pytz.UTC)
     ending_date = ending_date.replace(tzinfo=pytz.UTC)
@@ -250,7 +265,9 @@ def select_data(
     ]
     if not perfect_file.empty:
         filename = files[perfect_file.index[0]]
-        return select_klines_from_file(beginning_date, ending_date, filename, type)
+        return select_klines_from_file(
+            beginning_date, ending_date, filename, compute_metrics, type
+        )
 
     new_beginning_date = beginning_date
     new_ending_date = ending_date
@@ -273,30 +290,23 @@ def select_data(
         interval,
         new_beginning_date,
         new_ending_date,
-        compute_metrics,
         directory,
         type,
     )
-    return select_klines_from_file(beginning_date, ending_date, new_filename, type)
+    return select_klines_from_file(
+        beginning_date, ending_date, new_filename, compute_metrics, type
+    )
 
 
 if __name__ == "__main__":
-    # klines = select_data(
-    #     "LTC",
-    #     "1m",
-    #     beginning_date=datetime(2022, 4, 5),
-    #     ending_date=datetime(2022, 4, 6),
-    #     directory="whateverthefuck/",
-    #     type="csv",
-    # )
-    # klines = klines.dropna(axis=0)
-    from binance.client import Client
-
-    client = Client()
-    klines = client.get_historical_klines(
-        "LTCUSDT",
+    klines = select_data(
+        "LTC",
         "1m",
-        str(datetime(2022, 4, 5).timestamp() * 1000),
-        str(datetime(2022, 4, 6).timestamp() * 1000),
+        beginning_date=datetime(2022, 4, 5),
+        ending_date=datetime(2022, 4, 6),
+        directory="whateverthefuck/",
+        type="csv",
     )
+    klines = klines.dropna(axis=0)
+    print(klines)
     print(len(klines))

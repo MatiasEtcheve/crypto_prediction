@@ -11,25 +11,13 @@ class DataModule:
         self,
         config,
         compute_metrics=None,
-        csv_file=None,
         inputs=None,
+        save_klines=True,
     ):
         self.config = config
         self.compute_metrics = compute_metrics
-
-        if csv_file is not None and inputs is None:
-            df = pd.read_csv(csv_file, delimiter=";")
-            df["beginning_date"] = pd.to_datetime(
-                df.pop("beginning_date"), dayfirst=True, utc=True
-            )
-            df["ending_date"] = pd.to_datetime(
-                df.pop("ending_date"), dayfirst=True, utc=True
-            )
-            self.inputs = df.to_dict("records")
-        elif inputs is not None:
-            self.inputs = inputs
-        else:
-            raise NotImplementedError("")
+        self.inputs = inputs
+        self.save_klines = save_klines
 
     def _init_train_val_data(self, train_datapoints):
         test_ratio = self.config["train_val_test_split"][-1]
@@ -64,12 +52,17 @@ class DataModule:
                 **input,
                 interval=self.config["interval"],
                 compute_metrics=self.compute_metrics,
-                save_klines=True,
+                save_klines=self.save_klines,
             )
             if dp == []:
                 continue
             dp.df = dp.df.dropna()
-            dp.labels = dp.labels.loc[dp.df.index]
+            dp.labels = dp.labels.dropna()
+
+            common_index = dp.df.index.intersection(dp.labels.index)
+            dp.df = dp.df.loc[common_index]
+            dp.labels = dp.labels.loc[common_index].astype("bool")
+
             train_val_size = int(len(dp.df) * train_val_ratio)
             test_dp = assets.TrainAsset(
                 ticker=input["ticker"],
@@ -114,7 +107,12 @@ def _concatenate_indicators(data, percentage=0.1):
 
 
 def create_asset(
-    ticker, interval, beginning_date, ending_date, compute_metrics, save_klines=False
+    ticker,
+    interval,
+    beginning_date,
+    ending_date,
+    compute_metrics=lambda x: x,
+    save_klines=False,
 ):
     if save_klines:
         data = get_data.select_data(
@@ -126,7 +124,7 @@ def create_asset(
             directory=Path(__file__).resolve().parent / "tmp" / "klines",
         )
     else:
-        data = get_data.download_klines(
+        data = get_data.download_data(
             ticker,
             interval,
             beginning_date=beginning_date,
@@ -134,7 +132,7 @@ def create_asset(
             compute_metrics=compute_metrics,
         )
     data = data.replace(
-        to_replace=[np.inf, -np.inf, np.float32("inf"), -np.float32("inf")],
+        to_replace=[np.inf, -np.inf, float("inf"), float("inf")],
         value=0,
     )
     labels = data.pop("Direction")

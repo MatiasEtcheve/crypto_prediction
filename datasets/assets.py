@@ -46,10 +46,10 @@ class TrainAsset(object):
         self.interval = interval
         self.compute_metrics = compute_metrics
 
-        self.scaler = MinMaxScaler()
+        # self.scaler = MinMaxScaler()
 
-        if not self.isempty:
-            self.scaler.fit(self.df.to_numpy()[:, 6:])
+        # if not self.isempty:
+        #     self.scaler.fit(self.df.to_numpy()[:, 6:])
 
         assert len(self.labels) == len(self.df)
 
@@ -59,6 +59,7 @@ class TrainAsset(object):
 
     @property
     def features(self):
+        return self.df.to_numpy()[:, 6:]
         return self.scaler.transform(self.df.to_numpy()[:, 6:])
 
     def predict_from(self, rf):
