@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import get_data
 import numpy as np
 import pandas as pd
 from datapoints import assets

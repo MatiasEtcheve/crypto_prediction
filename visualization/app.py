@@ -8,7 +8,6 @@ from pathlib import Path
 from pprint import pprint
 from time import time
 
-import get_data
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -17,8 +16,8 @@ import pytz
 import quantstats as qs
 import streamlit as st
 from binance.client import Client
-from datasets import assets, portfolios
-from datasets.portfolios import PastPortfolio
+from datapoints import assets, portfolios
+from datapoints.portfolios import PastPortfolio
 from plotly.subplots import make_subplots
 from yfinance import Tickers
 

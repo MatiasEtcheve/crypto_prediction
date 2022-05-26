@@ -5,7 +5,6 @@ from pathlib import Path
 from pprint import pprint
 from typing import Callable, List, Optional, Union
 
-import get_data
 import numpy as np
 import pandas as pd
 import pytz

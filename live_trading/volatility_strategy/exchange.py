@@ -11,16 +11,15 @@ from pathlib import Path
 from pprint import pprint
 from tkinter.messagebox import INFO
 
-import datasets.assets as assets
-import datasets.portfolios as portfolios
-import get_data
+import datapoints.assets as assets
+import datapoints.portfolios as portfolios
 import numpy as np
 import wandb
 from binance import AsyncClient, BinanceSocketManager
 from binance.client import Client
 from binance.enums import *
 from binance.exceptions import *
-from datasets.filters import *
+from datapoints.filters import *
 from tools import inspect_code, plotting, training, wandb_api
 
 saving_path = Path().resolve().parent

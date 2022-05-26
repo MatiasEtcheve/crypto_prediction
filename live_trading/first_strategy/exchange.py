@@ -11,9 +11,8 @@ from pathlib import Path
 from pprint import pprint
 from tkinter.messagebox import INFO
 
-import datasets.assets as assets
-import datasets.portfolios as portfolios
-import get_data
+import datapoints.assets as assets
+import datapoints.portfolios as portfolios
 import numpy as np
 import wandb
 from binance import AsyncClient, BinanceSocketManager
