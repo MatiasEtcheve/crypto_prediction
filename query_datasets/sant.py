@@ -1,7 +1,6 @@
 from datetime import datetime
 
 import pandas as pd
-import san
 
 
 def fetch_santiment(
@@ -10,6 +9,7 @@ def fetch_santiment(
     beginning_date: datetime,
     ending_date: datetime,
 ) -> pd.DataFrame:
+    import san
 
     assert symbol == "BTC"
     slug = "santiment"

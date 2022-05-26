@@ -4,7 +4,6 @@ from typing import Callable
 
 import pandas as pd
 import pytz
-import yfinance as yf
 from tools.dataframe import convert_to_timedelta
 
 # FORMAT = "%Y-%m-%d"
@@ -18,6 +17,7 @@ def fetch_klines(
     beginning_date: datetime,
     ending_date: datetime,
 ):
+    import yfinance as yf
 
     assert (
         isinstance(symbol, str) or len(symbol) == 1

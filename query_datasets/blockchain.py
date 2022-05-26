@@ -1,13 +1,10 @@
 import json
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from typing import Callable, Optional
+from datetime import datetime
+from typing import Optional
 
 import pandas as pd
 import pytz
 import requests
-import yfinance as yf
-from numpy import block
 
 
 def fetch_blockchain(
