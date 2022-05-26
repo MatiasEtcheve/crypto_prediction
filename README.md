@@ -1,1 +1,5 @@
-## Binance
+# Binance
+
+```{python}
+pip install --editable .
+```
