@@ -37,3 +37,4 @@ tqdm==4.62.3
 typing_extensions==4.1.1
 wandb==0.12.11
 yfinance==0.1.70
+kaleido
