@@ -32,37 +32,3 @@ class ScriptCheckpoint(tf.keras.callbacks.Callback):
             filename_datamodule = Path(self.dirpath) / "datamodule_script.txt"
             with open(filename_datamodule, "w") as file:
                 file.write(inspect_code.get_class_code(type(self.datamodule)))
-
-
-def precision_recall_accuracy_metrics(
-    predictions: Union[pd.DataFrame, np.ndarray],
-    targets: Union[pd.DataFrame, np.ndarray],
-) -> Tuple[float, float, float]:
-    """Computes precision, recall and accuracy metrics
-
-    Args:
-        predictions (Union[pd.DataFrame, np.ndarray]): predictions, y_hat
-        targets (Union[pd.DataFrame, np.ndarray]): targets, y
-
-    Returns:
-        Tuple[float, float, float]: tuple of precision, recall, accuracy metrics
-    """
-    if isinstance(predictions, pd.DataFrame) or isinstance(predictions, pd.Series):
-        predictions = predictions.to_numpy()
-    if isinstance(targets, pd.DataFrame) or isinstance(targets, pd.Series):
-        targets = targets.to_numpy()
-    recall = recall_score(
-        targets.reshape(-1, 1), predictions.reshape(-1, 1), zero_division=0
-    )
-    precision = precision_score(
-        targets.reshape(-1, 1), predictions.reshape(-1, 1), zero_division=0
-    )
-    accuracy = accuracy_score(
-        targets.reshape(-1, 1),
-        predictions.reshape(-1, 1),
-    )
-    return (
-        precision,
-        recall,
-        accuracy,
-    )
