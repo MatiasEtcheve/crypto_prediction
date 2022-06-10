@@ -3,7 +3,6 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
 
-import get_data
 import pandas as pd
 import pytz
 from binance.client import Client
