@@ -135,7 +135,6 @@ def regression_metrics(
                 )
             )
         else:
-            print(globals()[metric_name]())
             _metrics[metric_name] = globals()[metric_name]()(targets, pred)
     return _metrics
 

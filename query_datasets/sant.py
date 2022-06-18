@@ -21,7 +21,7 @@ def fetch_santiment(
         # "sentiment_balance_total_change_1d",
         # "sentiment_balance_total_change_30d",
         # "sentiment_balance_total_change_7d",
-        # "sentiment_balance_twitter",
+        "sentiment_balance_twitter",
         # "sentiment_balance_twitter_crypto",
         # "sentiment_balance_twitter_news",
         # "sentiment_balance_youtube_videos",

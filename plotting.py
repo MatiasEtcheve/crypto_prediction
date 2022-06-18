@@ -1,8 +1,10 @@
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import tensorflow as tf
 from plotly.subplots import make_subplots
 
+import metrics as _metrics
 from tools import dataframe
 
 
@@ -130,7 +132,11 @@ def prediction_segments(predictions, df, interval, lag):
     return positive_segment, negative_segment
 
 
-def classification_plot(base_datapoints, interval, lag, threshold=None, max_plots=None):
+def classification_plot(
+    base_datapoints, interval, lag, threshold=None, metrics=False, max_plots=None
+):
+    if metrics:
+        current_metrics = []
     if max_plots is None:
         max_plots = len(base_datapoints.keys())
 
@@ -141,11 +147,13 @@ def classification_plot(base_datapoints, interval, lag, threshold=None, max_plot
             break
 
         labels = dp.labels
-        if threshold is not None:
-            predictions = pd.Series(dp.probabilities > threshold, index=labels.index)
-        else:
-            predictions = pd.Series(dp.predictions, index=labels.index)
         df = dp.df
+        if threshold is not None and "probabilities" in dp.predictions.columns:
+            predictions = dp.predictions["probabilities"]
+        else:
+            predictions = dp.predictions["predictions"].astype(bool)
+        if metrics:
+            current_metrics.append(_metrics.classification_metrics(labels, predictions))
 
         fig.add_trace(
             go.Scatter(
@@ -180,4 +188,84 @@ def classification_plot(base_datapoints, interval, lag, threshold=None, max_plot
                 row=index + 1,
                 col=1,
             )
+    if metrics:
+        return current_metrics, fig
     return fig
+
+
+import math
+
+
+def make_grid(
+    tensor,
+    nrow: int = 8,
+    padding: int = 2,
+    normalize: bool = False,
+    value_range=None,
+    scale_each: bool = False,
+    pad_value: float = 0.0,
+    **kwargs,
+):
+
+    # if list of tensors, convert to a 4D mini-batch Tensor
+    if isinstance(tensor, list):
+        tensor = tf.stack(tensor, dim=0)
+
+    if len(tensor.shape) == 2:  # single image H x W
+        tensor = tensor.unsqueeze(0)
+    if len(tensor.shape) == 3:  # single image
+        if tensor.shape[0] == 1:  # if single-channel, convert to 3-channel
+            tensor = tf.concat((tensor, tensor, tensor), 0)
+        tensor = tf.expand_dims(tensor, 0)
+
+    if len(tensor.shape) == 4 and tensor.shape[1] == 1:  # single-channel images
+        tensor = tf.concat((tensor, tensor, tensor), 1)
+
+    if normalize is True:
+        tensor = tf.identity(tensor)  # avoid modifying tensor in-place
+        if value_range is not None:
+            assert isinstance(
+                value_range, tuple
+            ), "value_range has to be a tuple (min, max) if specified. min and max are numbers"
+
+        def norm_ip(img, low, high):
+            img = tf.clip_by_value(img, low, high)
+            img = (img - low) / max(high - low, 1e-5)
+            print(tf.math.reduce_min(img), tf.math.reduce_max(img))
+
+        def norm_range(t, value_range):
+            if value_range is not None:
+                norm_ip(t, value_range[0], value_range[1])
+            else:
+                norm_ip(t, float(tf.math.reduce_min(t)), float(tf.math.reduce_max(t)))
+
+        if scale_each is True:
+            for t in tensor:  # loop over mini-batch dimension
+                norm_range(t, value_range)
+        else:
+            norm_range(tensor, value_range)
+
+    if tensor.shape[0] == 1:
+        return tf.squeeze(tensor)
+
+    # make the mini-batch of images into a grid
+    nmaps = tensor.shape[0]
+    xmaps = min(nrow, nmaps)
+    ymaps = int(math.ceil(float(nmaps) / xmaps))
+    height, width = int(tensor.shape[2] + padding), int(tensor.shape[3] + padding)
+    num_channels = tensor.shape[1]
+    grid = tf.fill(
+        (num_channels, height * ymaps + padding, width * xmaps + padding), pad_value
+    ).numpy()
+    k = 0
+    for y in range(ymaps):
+        for x in range(xmaps):
+            if k >= nmaps:
+                break
+            grid[
+                :,
+                y * height + padding : (y + 1) * height,
+                x * width + padding : (x + 1) * width,
+            ] = tensor[k]
+            k = k + 1
+    return grid
